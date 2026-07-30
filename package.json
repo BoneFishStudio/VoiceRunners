@@ -35,7 +35,6 @@
       ],
       "icon": "assets/icon.png",
       "sign": false,
-      "signAndEditExecutable": false,
       "artifactName": "VoiceRunner-Setup-${version}-win.${ext}"
     },
     "mac": {
