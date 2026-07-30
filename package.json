@@ -29,13 +29,13 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.png",
       "sign": false,
-      "artifactName": "VoiceRunner-Setup-${version}-win.${ext}"
+      "artifactName": "VoiceRunner-${version}-win.${ext}"
     },
     "mac": {
       "target": [

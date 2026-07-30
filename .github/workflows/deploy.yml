@@ -164,7 +164,7 @@ jobs:
           name: "Voice Runner ${{ steps.create_release.outputs.version }}"
           files: |
             VoiceRunner-*.zip
-            dist-electron/VoiceRunner-Setup-*.exe
+            dist-electron/VoiceRunner-*-win.exe
             dist-electron/VoiceRunner-*.AppImage
           body: |
             ## 🚀 Voice Runner ${{ steps.create_release.outputs.version }}
@@ -181,7 +181,7 @@ jobs:
             | Platform | File |
             |----------|------|
             | 🌐 Web | [Vercel](${{ steps.deploy_url.outputs.url || '#' }}) |
-            | 🪟 Windows | VoiceRunner-Setup-*.exe (lihat Assets bawah) |
+            | 🪟 Windows | VoiceRunner-*-win.exe (lihat Assets bawah, portable no-install) |
             | 🐧 Linux | VoiceRunner-*.AppImage (lihat Assets bawah) |
             | 📦 Itch.io | ZIP game (lihat Assets bawah) |
             
