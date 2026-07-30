@@ -60,8 +60,6 @@
 2. Upload ke https://itch.io/game/new sebagai HTML
 ```
 
-> 📖 **Setup lengkap** (Firebase, Vercel Secrets, API Key) ada di [`SETUP.md`](SETUP.md)
-
 ---
 
 ## 🛠 TEKNOLOGI
@@ -99,7 +97,6 @@
 │   └── 📄 style.css     → Styling
 ├── 📁 Music/             → File musik MP3
 ├── 📁 assets/            → Sprite & aset
-├── 📄 SETUP.md           → Setup guide (Firebase, Secrets, dll)
 └── 📁 .github/workflows/ → CI/CD auto-deploy ke Vercel
 ```
 
