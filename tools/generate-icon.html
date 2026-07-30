@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Voice Runner Icon</title></head>
+<body style="background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:sans-serif;color:white;">
+  <h2>🎤 Voice Runner — Icon Generator</h2>
+  <p style="color:#888;margin-bottom:20px;">Icon 256x256 akan di-generate otomatis...</p>
+  
+  <canvas id="iconCanvas" width="256" height="256"></canvas>
+  
+  <div style="margin-top:20px;display:flex;gap:10px;">
+    <button onclick="downloadIcon()" style="padding:12px 24px;background:#fff;color:#000;border:none;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">
+      💾 Download icon.png
+    </button>
+    <button onclick="downloadAllSizes()" style="padding:12px 24px;background:#444;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer;">
+      📦 Download All Sizes
+    </button>
+  </div>
+  <p style="color:#666;margin-top:12px;font-size:13px;">
+    Simpan sebagai <code>assets/icon.png</code> di folder project
+  </p>
+
+  <script>
+    const canvas = document.getElementById('iconCanvas');
+    const ctx = canvas.getContext('2d');
+    const SIZE = 256;
+
+    function drawRunner(ctx, size) {
+      const s = size / 256; // scale factor
+      
+      // Clear
+      ctx.clearRect(0, 0, size, size);
+      
+      // Background circle (glow)
+      const cx = size / 2;
+      const cy = size / 2 + 10 * s;
+      
+      // Outer glow
+      const glowGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 130 * s);
+      glowGrad.addColorStop(0, 'rgba(100, 200, 255, 0.15)');
+      glowGrad.addColorStop(0.5, 'rgba(80, 150, 255, 0.08)');
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 130 * s, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // === RUNNER CHARACTER ===
+      const px = size / 2;
+      const py = size / 2 + 50 * s; // ground level
+      
+      // Shadow
+      ctx.save();
+      ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
+      ctx.shadowBlur = 20 * s;
+      
+      // Body (torso)
+      const bodyGrad = ctx.createLinearGradient(px - 15 * s, py - 60 * s, px + 15 * s, py - 30 * s);
+      bodyGrad.addColorStop(0, '#8ad4ff');
+      bodyGrad.addColorStop(0.5, '#ffffff');
+      bodyGrad.addColorStop(1, '#8ad4ff');
+      ctx.fillStyle = bodyGrad;
+      ctx.shadowBlur = 15 * s;
+      ctx.fillRect(px - 15 * s, py - 65 * s, 30 * s, 35 * s);
+      
+      // Body center line
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.3)';
+      ctx.fillRect(px - 3 * s, py - 62 * s, 6 * s, 28 * s);
+      
+      // Head
+      ctx.shadowBlur = 12 * s;
+      const headGrad = ctx.createRadialGradient(
+        px, py - 74 * s, 3 * s,
+        px, py - 74 * s, 22 * s
+      );
+      headGrad.addColorStop(0, '#ffffff');
+      headGrad.addColorStop(0.7, '#c0e8ff');
+      headGrad.addColorStop(1, '#8ad4ff');
+      ctx.fillStyle = headGrad;
+      ctx.beginPath();
+      ctx.arc(px, py - 74 * s, 22 * s, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Visor (eyes)
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.6)';
+      ctx.fillRect(px - 10 * s, py - 78 * s, 20 * s, 5 * s);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillRect(px - 8 * s, py - 78 * s, 16 * s, 3 * s);
+      
+      // Left arm (running pose)
+      ctx.shadowBlur = 6 * s;
+      ctx.fillStyle = '#8ad4ff';
+      ctx.save();
+      ctx.translate(px - 12 * s, py - 58 * s);
+      ctx.rotate(-0.3);
+      ctx.fillRect(-3 * s, 0, 8 * s, 28 * s);
+      // Hand
+      ctx.fillStyle = '#64c8ff';
+      ctx.fillRect(-3 * s, 26 * s, 8 * s, 6 * s);
+      ctx.restore();
+      
+      // Right arm
+      ctx.fillStyle = '#8ad4ff';
+      ctx.save();
+      ctx.translate(px + 12 * s, py - 58 * s);
+      ctx.rotate(0.3);
+      ctx.fillRect(-5 * s, 0, 8 * s, 28 * s);
+      ctx.fillStyle = '#64c8ff';
+      ctx.fillRect(-5 * s, 26 * s, 8 * s, 6 * s);
+      ctx.restore();
+      
+      // Left leg (running)
+      ctx.shadowBlur = 6 * s;
+      ctx.fillStyle = '#7ac0ee';
+      ctx.save();
+      ctx.translate(px - 11 * s, py - 32 * s);
+      ctx.rotate(0.4);
+      ctx.fillRect(-3 * s, 0, 10 * s, 30 * s);
+      // Shoe
+      ctx.fillStyle = '#5ab0dd';
+      ctx.fillRect(-5 * s, 28 * s, 14 * s, 8 * s);
+      ctx.restore();
+      
+      // Right leg
+      ctx.fillStyle = '#7ac0ee';
+      ctx.save();
+      ctx.translate(px + 9 * s, py - 32 * s);
+      ctx.rotate(-0.3);
+      ctx.fillRect(-3 * s, 0, 10 * s, 30 * s);
+      ctx.fillStyle = '#5ab0dd';
+      ctx.fillRect(-5 * s, 28 * s, 14 * s, 8 * s);
+      ctx.restore();
+      
+      ctx.restore();
+      
+      // === SPEED LINES ===
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      for (let i = 0; i < 5; i++) {
+        const lx = px - 70 * s - i * 25 * s;
+        const ly = py - 30 * s + Math.sin(i * 1.5) * 20 * s;
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.4)';
+        ctx.lineWidth = 2 * s;
+        ctx.shadowBlur = 5 * s;
+        ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx - 25 * s, ly - 5 * s);
+        ctx.stroke();
+      }
+      ctx.restore();
+      
+      // === GROUND LINE ===
+      ctx.save();
+      const groundGlow = ctx.createLinearGradient(0, py + 2 * s, 0, py + 12 * s);
+      groundGlow.addColorStop(0, 'rgba(100, 200, 255, 0)');
+      groundGlow.addColorStop(0.3, 'rgba(100, 200, 255, 0.3)');
+      groundGlow.addColorStop(1, 'rgba(100, 200, 255, 0)');
+      ctx.fillStyle = groundGlow;
+      ctx.fillRect(0, py + 2 * s, size, 10 * s);
+      
+      ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
+      ctx.shadowBlur = 6 * s;
+      ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath();
+      ctx.moveTo(30 * s, py);
+      ctx.lineTo(size - 30 * s, py);
+      ctx.stroke();
+      ctx.restore();
+      
+      // === RUNNER TEXT ===
+      ctx.save();
+      ctx.font = `bold ${28 * s}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.shadowColor = 'rgba(100, 200, 255, 0.2)';
+      ctx.shadowBlur = 10 * s;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('VOICE RUNNER', size / 2, 12 * s);
+      ctx.restore();
+    }
+
+    // Draw at 256px
+    drawRunner(ctx, SIZE);
+    
+    // Draw also at smaller sizes for preview
+    function drawPreview(size, canvasId) {
+      const c = document.getElementById(canvasId);
+      if (!c) return;
+      const ctx2 = c.getContext('2d');
+      drawRunner(ctx2, size);
+    }
+
+    // Download functions
+    function downloadIcon() {
+      const link = document.createElement('a');
+      link.download = 'icon.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadAllSizes() {
+      const sizes = [256, 128, 64, 48, 32, 16];
+      sizes.forEach(size => {
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx2 = c.getContext('2d');
+        drawRunner(ctx2, size);
+        const link = document.createElement('a');
+        link.download = `icon_${size}x${size}.png`;
+        link.href = c.toDataURL('image/png');
+        link.click();
+      });
+    }
+    
+    // Auto-download after 1 second
+    setTimeout(() => {
+      downloadIcon();
+      document.querySelector('p').textContent = '✅ Icon siap! Klik download lagi kalau perlu.';
+    }, 1000);
+  </script>
+</body>
+</html>
