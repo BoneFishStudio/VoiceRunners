@@ -125,21 +125,6 @@ jobs:
           git push origin $VERSION
           echo "✅ Tag created: $VERSION"
 
-      - name: 📦 Install dependencies for Electron
-        if: success()
-        run: |
-          npm install
-
-      - name: 🏗️ Build Electron (Windows + Linux)
-        if: success()
-        run: |
-          # Build Windows (no signing — kita gak punya sertifikat)
-          # + Linux (native di Linux runner, no Wine needed)
-          npx electron-builder --win --x64 --linux --x64
-          echo "=== ✅ Electron Build ==="
-          ls -lh dist-electron/
-          echo "======================="
-
       - name: 📦 Build ZIP (Itch.io ready)
         if: success()
         run: |
@@ -164,8 +149,6 @@ jobs:
           name: "Voice Runner ${{ steps.create_release.outputs.version }}"
           files: |
             VoiceRunner-*.zip
-            dist-electron/VoiceRunner-*-win.exe
-            dist-electron/VoiceRunner-*.AppImage
           body: |
             ## 🚀 Voice Runner ${{ steps.create_release.outputs.version }}
             
@@ -180,9 +163,7 @@ jobs:
             
             | Platform | File |
             |----------|------|
-            | 🌐 Web | [Vercel](${{ steps.deploy_url.outputs.url || '#' }}) |
-            | 🪟 Windows | VoiceRunner-*-win.exe (lihat Assets bawah, portable no-install) |
-            | 🐧 Linux | VoiceRunner-*.AppImage (lihat Assets bawah) |
+            | 🌐 Web | [Main](${{ steps.deploy_url.outputs.url || '#' }}) |
             | 📦 Itch.io | ZIP game (lihat Assets bawah) |
             
             ---
