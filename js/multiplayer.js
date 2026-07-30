@@ -345,12 +345,13 @@ const Multiplayer = {
             
             // ✅ Deteksi game dimulai oleh host!
             if (data.status === 'playing' && !this.gameStarted && !this.isHost) {
-                this.gameStarted = true;
-                // Sembunyikan multiplayer screen, mulai game
-                document.getElementById('multiplayerScreen').classList.remove('active');
-                if (typeof Game !== 'undefined' && Game.startMultiplayer) {
-                    Game.startMultiplayer();
-                }
+            this.gameStarted = true;
+            // Sembunyikan multiplayer screen, mulai game
+            document.getElementById('multiplayerScreen').classList.remove('active');
+            if (typeof Game !== 'undefined' && Game.startMultiplayer) {
+                // Pass seed dari room supaya rintangan identik semua pemain
+                Game.startMultiplayer(data.seed);
+            }
             }
             
             if (this.onUpdate) this.onUpdate(data);
@@ -388,7 +389,8 @@ const Multiplayer = {
             if (typeof Game !== 'undefined' && Game.startMultiplayer) {
                 // Sembunyikan multiplayer screen
                 document.getElementById('multiplayerScreen').classList.remove('active');
-                Game.startMultiplayer();
+                // Pass seed biar rintangan identik di semua client
+                Game.startMultiplayer(seed);
             }
         } catch(e) {
             console.error('Start game error:', e);

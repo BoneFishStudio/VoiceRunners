@@ -8,9 +8,27 @@ const GROUND_Y_RATIO = 0.78;
 const BASE_SPEED = 5;
 const MAX_SPEED = 14;
 const SPEED_INCREMENT = 0.001;
+const RAMP_SPEED_BOOST = 0.8;       // Tambahan speed per ramp (1000m)
+const RAMP_INTERVAL = 1000;         // Meter per ramp
 const OBSTACLE_MIN_GAP = 120;
 const OBSTACLE_MAX_GAP = 200;
 const PIT_CHANCE = 0.15;
+
+/**
+ * mulberry32 — Seeded PRNG sederhana.
+ * Deterministic: seed yang sama selalu menghasilkan urutan angka yang sama.
+ * Dipakai untuk spawn rintangan supaya semua pemain di room yang sama
+ * mendapat obstacle/pit yang identik di jarak yang sama.
+ * Efek visual (partikel, background) tetap pakai Math.random() biasa.
+ */
+function mulberry32(a) {
+    return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        var t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
 
 // Jump heights
 const JUMP_FORCES = {
@@ -65,6 +83,13 @@ const Game = {
     
     // Ground
     groundX: 0,
+    
+    // Seed & RNG (untuk deterministic multiplayer sync)
+    seed: 0,
+    _rng: null,
+    
+    // Ramp kesulitan
+    rampMultiplier: 1, // 1x = normal, ~1.16x at 1000m, ~1.32x at 2000m, etc
     
     // Timers
     lastObstacleDist: 0,
@@ -402,11 +427,11 @@ const Game = {
         this.startCountdown();
     },
     
-    startMultiplayer() {
+    startMultiplayer(seed) {
         this.stopMenuDemo();
         this.showCanvas();
         this.isMultiplayer = true;
-        this.resetGame();
+        this.resetGame(seed); // Seed dari multiplayer room untuk deterministic spawn
         // Mulai voice volume detection (countdown 3s cukup untuk mic siap)
         this.startVoiceVolumeDetection();
         this.startCountdown();
@@ -423,7 +448,7 @@ const Game = {
         document.getElementById('instructionsOverlay').classList.remove('overlay-active');
     },
     
-    resetGame() {
+    resetGame(seed) {
         this.player.y = this.player.groundY;
         this.player.vy = 0;
         this.player.jumpLevel = 0;
@@ -458,6 +483,21 @@ const Game = {
         // Reset voice state
         this.voiceVolume = 0;
         this.voiceJumpCooldown = 0;
+        
+        // RNG: seeded untuk deterministic obstacle spawning (multiplayer sync)
+        // - Kalau ada seed dari multiplayer, pakai itu
+        // - Solo mode: random
+        if (seed !== undefined) {
+            this.seed = seed;
+        } else if (typeof Multiplayer !== 'undefined' && 
+                   Multiplayer.currentRoomData && 
+                   Multiplayer.currentRoomData.seed) {
+            this.seed = Multiplayer.currentRoomData.seed;
+        } else {
+            this.seed = Math.floor(Math.random() * 999999) + 1;
+        }
+        this._rng = mulberry32(this.seed);
+        this.rampMultiplier = 1;
         
         this.updateHUD();
     },
@@ -537,6 +577,16 @@ const Game = {
             this.speed += SPEED_INCREMENT;
         }
         this.gameSpeed = this.speed * (1 + this.distance / 5000);
+        
+        // ===== RAMP KESULITAN PER 1000m =====
+        // Setiap kelipatan 1000m, speed naik bertahap (bukan lompatan mendadak)
+        // Contoh: 1000m → speed +0.8, 2000m → speed +1.6, 3000m → speed +2.4, dst
+        const currentRamp = Math.floor(this.distance / RAMP_INTERVAL);
+        const targetRampMultiplier = 1 + (currentRamp * RAMP_SPEED_BOOST / BASE_SPEED);
+        // Transisi gradual — bukan lompatan langsung
+        this.rampMultiplier += (targetRampMultiplier - this.rampMultiplier) * 0.005;
+        this.gameSpeed = this.gameSpeed * (1 + (this.rampMultiplier - 1) * 0.3);
+        
         if (this.gameSpeed > MAX_SPEED) this.gameSpeed = MAX_SPEED;
         
         // Update distance
@@ -713,25 +763,30 @@ const Game = {
     // ===== OBSTACLES =====
     
     generateObstacles() {
-        const shouldGen = Math.random() < 0.008 * (this.gameSpeed / BASE_SPEED);
+        // ── DETERMINISTIC ── pakai seeded RNG supaya hasilnya sama
+        // untuk semua pemain di room yang sama (multiplayer sync)
+        const shouldGen = this._rng() < 0.008 * (this.gameSpeed / BASE_SPEED);
         
         if (shouldGen && this.canGenerateObstacle()) {
-            const types = ['obstacle', 'pit'];
-            const isPit = Math.random() < PIT_CHANCE;
+            const isPit = this._rng() < PIT_CHANCE;
             
             if (isPit && !this.activePit) {
                 this.createPit();
-            } else if (!isPit) {
+            } else {
+                // FALLBACK: kalau pit gak bisa dibuat (activePit masih aktif),
+                // tetap spawn obstacle biasa — jangan biarkan slot kosong!
                 this.createObstacle();
             }
         }
+        // ── RANDOM MURNI ── sisanya (efek visual, partikel) tetap Math.random()
     },
     
     canGenerateObstacle() {
         const lastDist = this.lastObstacleDist;
         const minGap = OBSTACLE_MIN_GAP * (BASE_SPEED / this.gameSpeed);
         const maxGap = OBSTACLE_MAX_GAP * (BASE_SPEED / this.gameSpeed);
-        const gap = minGap + Math.random() * (maxGap - minGap);
+        // ── DETERMINISTIC ── gap dihitung pakai seeded RNG
+        const gap = minGap + this._rng() * (maxGap - minGap);
         
         if (this.distance - lastDist > gap) {
             this.lastObstacleDist = this.distance;
@@ -744,40 +799,36 @@ const Game = {
     get logicalH() { return this._h || this.canvas.height / (window.devicePixelRatio || 1); },
     
     createObstacle() {
-        // Pilih type dulu, baru tentukan tinggi berdasarkan type
-        // Setiap type punya tinggi spesifik yang cocok dengan level suara:
-        //   Type 1 (Spike, merah):  rendah → butuh suara pelan  → level 1
-        //   Type 0 (Box, oranye):   sedang → butuh suara normal → level 2
-        //   Type 2 (Pillar, ungu):  tinggi  → butuh suara keras  → level 3
-        const typeWeights = [0.35, 0.35, 0.3]; // box, spike, pillar
-        const rand = Math.random();
+        // ── DETERMINISTIC ── semua pakai seeded RNG
+        // Pilih type: 0=Box, 1=Spike, 2=Pillar
+        const typeWeights = [0.35, 0.35, 0.3];
+        const rand = this._rng();
         let type;
-        if (rand < typeWeights[0]) type = 0;       // Box (sedang)
-        else if (rand < typeWeights[0] + typeWeights[1]) type = 1; // Spike (rendah)
-        else type = 2; // Pillar (tinggi)
+        if (rand < typeWeights[0]) type = 0;
+        else if (rand < typeWeights[0] + typeWeights[1]) type = 1;
+        else type = 2;
         
         let obsHeight, obsY;
         
         switch(type) {
             case 0: // Box — butuh suara normal (level 2)
-                obsHeight = 35 + Math.random() * 10; // 35-45px
+                obsHeight = 35 + this._rng() * 10;
                 break;
             case 1: // Spike — butuh suara pelan (level 1)
-                obsHeight = 22 + Math.random() * 8; // 22-30px
+                obsHeight = 22 + this._rng() * 8;
                 break;
             case 2: // Pillar — butuh suara keras (level 3)
-                obsHeight = 55 + Math.random() * 10; // 55-65px
+                obsHeight = 55 + this._rng() * 10;
                 break;
         }
         
         obsY = this.player.groundY - obsHeight;
         
-        // Lebar disesuaikan dengan type
         let obsWidth;
         switch(type) {
-            case 0: obsWidth = 18 + Math.random() * 8; break;  // Box: 18-26
-            case 1: obsWidth = 16 + Math.random() * 6; break;  // Spike: 16-22
-            case 2: obsWidth = 20 + Math.random() * 8; break;  // Pillar: 20-28
+            case 0: obsWidth = 18 + this._rng() * 8; break;
+            case 1: obsWidth = 16 + this._rng() * 6; break;
+            case 2: obsWidth = 20 + this._rng() * 8; break;
         }
         
         this.obstacles.push({
@@ -787,19 +838,19 @@ const Game = {
             height: obsHeight,
             type: type,
             passed: false,
-            // Label voice level untuk ditampilkan (opsional)
             voiceLevel: type === 0 ? 2 : type === 1 ? 1 : 3
         });
     },
     
     createPit() {
-        const pitWidth = 50 + Math.random() * 40;
+        // ── DETERMINISTIC ── seeded RNG supaya sinkron multiplayer
+        const pitWidth = 50 + this._rng() * 40;
         const textOptions = [
             "LARI", "LONCAT", "BERHENTI", "MAJU", "MUNDUR",
             "KIRI", "KANAN", "CEPAT", "LAMBAT", "PUTAR",
             "TERBANG", "GESER", "HENTI", "DIAM", "AMBIL"
         ];
-        const text = textOptions[Math.floor(Math.random() * textOptions.length)];
+        const text = textOptions[Math.floor(this._rng() * textOptions.length)];
         
         this.activePit = {
             x: this.logicalW + 50,
