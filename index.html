@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Voice Runner</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Canvas untuk gameplay -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- ========== MAIN MENU (LAYOUT BARU) ========== -->
+    <div id="mainMenu" class="screen active">
+        <div class="menu-split">
+            <!-- LEFT PANEL: Title + Buttons bottom-left -->
+            <div class="menu-left">
+                <div class="menu-left-inner">
+                    <div class="game-title">
+                        <h1>VOICE</h1>
+                        <h1 class="title-accent">RUNNER</h1>
+                        <div class="title-line"></div>
+                        <p class="subtitle">Lari. Lompat. Baca. Bertahan.</p>
+                    </div>
+                    <div class="menu-spacer"></div>
+                    <div class="menu-buttons">
+                        <button class="menu-btn primary" onclick="startGame()">
+                            <span class="btn-icon">▶</span> START
+                        </button>
+                        <button class="menu-btn" onclick="showLeaderboard()">
+                            <span class="btn-icon">🏆</span> LEADERBOARD
+                        </button>
+                        <button class="menu-btn" onclick="showSettings()">
+                            <span class="btn-icon">⚙</span> SETTINGS
+                        </button>
+                        <button class="menu-btn exit" onclick="exitGame()">
+                            <span class="btn-icon">✕</span> EXIT
+                        </button>
+                    </div>
+                    <div class="menu-footer">
+                        <p>🎤 Gunakan suaramu untuk mengisi lubang!</p>
+                    </div>
+                </div>
+            </div>
+            <!-- RIGHT PANEL: Character animation -->
+            <div class="menu-right">
+                <canvas id="menuCharacterCanvas"></canvas>
+                <div class="menu-right-overlay">
+                    <div class="menu-features">
+                        <div class="feature-item">
+                            <span class="feature-icon">🏃</span>
+                            <span class="feature-text">Endless Runner</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🎤</span>
+                            <span class="feature-text">Voice Challenge</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">👥</span>
+                            <span class="feature-text">Multiplayer 4P</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Versi mobile (fallback) -->
+        <div class="menu-mobile">
+            <div class="game-title">
+                <h1>VOICE</h1>
+                <h1 class="title-accent">RUNNER</h1>
+                <div class="title-line"></div>
+                <p class="subtitle">Lari. Lompat. Baca. Bertahan.</p>
+            </div>
+            <div class="menu-buttons">
+                <button class="menu-btn primary" onclick="startGame()">
+                    <span class="btn-icon">▶</span> START
+                </button>
+                <button class="menu-btn" onclick="showLeaderboard()">
+                    <span class="btn-icon">🏆</span> LEADERBOARD
+                </button>
+                <button class="menu-btn" onclick="showSettings()">
+                    <span class="btn-icon">⚙</span> SETTINGS
+                </button>
+                <button class="menu-btn exit" onclick="exitGame()">
+                    <span class="btn-icon">✕</span> EXIT
+                </button>
+            </div>
+            <div class="menu-footer">
+                <p>🎤 Gunakan suaramu untuk mengisi lubang!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== LOADING SCREEN ========== -->
+    <div id="loadingScreen" class="screen">
+        <div class="loading-container">
+            <div class="loading-runner">
+                <canvas id="loadingCanvas" width="100" height="80"></canvas>
+            </div>
+            <h2>MEMUAT...</h2>
+            <div class="loading-bar">
+                <div class="loading-fill" id="loadingFill"></div>
+            </div>
+            <p id="loadingText">Menyiapkan arena...</p>
+        </div>
+    </div>
+
+    <!-- ========== MODE SELECT ========== -->
+    <div id="modeSelect" class="screen">
+        <div class="mode-container">
+            <h2>PILIH MODE</h2>
+            <div class="mode-buttons">
+                <button class="mode-btn solo" onclick="startSolo()">
+                    <span class="mode-icon">👤</span>
+                    <span class="mode-title">SOLO</span>
+                    <span class="mode-desc">Main sendirian</span>
+                </button>
+                <button class="mode-btn multiplayer" onclick="showMultiplayer()">
+                    <span class="mode-icon">👥</span>
+                    <span class="mode-title">MULTIPLAYER</span>
+                    <span class="mode-desc">4 pemain online</span>
+                </button>
+            </div>
+            <button class="back-btn" onclick="showMainMenu()">← KEMBALI</button>
+        </div>
+    </div>
+
+    <!-- ========== MULTIPLAYER ========== -->
+    <div id="multiplayerScreen" class="screen">
+        <div class="mp-container">
+            <h2>MULTIPLAYER</h2>
+            <div class="mp-tabs">
+                <button class="mp-tab active" onclick="switchMpTab('create')" id="tabCreate">BUAT ROOM</button>
+                <button class="mp-tab" onclick="switchMpTab('join')" id="tabJoin">GABUNG ROOM</button>
+            </div>
+            
+            <!-- Create Room -->
+            <div id="mpCreate" class="mp-panel active">
+                <div class="mp-room-code" id="roomCodeDisplay">
+                    <p>Kode Room:</p>
+                    <h3 id="generatedCode">------</h3>
+                </div>
+                <div class="mp-input-group">
+                    <label>Password (opsional)</label>
+                    <input type="password" id="roomPassword" placeholder="Kosongkan jika tanpa password" maxlength="20">
+                </div>
+                <button class="menu-btn primary" onclick="createRoom()">
+                    <span class="btn-icon">🚀</span> BUAT ROOM
+                </button>
+                <div id="roomStatus" class="mp-status"></div>
+            </div>
+
+            <!-- Join Room -->
+            <div id="mpJoin" class="mp-panel">
+                <div class="mp-input-group">
+                    <label>Kode Room</label>
+                    <input type="text" id="joinCode" placeholder="Masukkan 6 digit kode" maxlength="6" style="text-transform:uppercase;font-size:2rem;text-align:center;letter-spacing:8px;">
+                </div>
+                <div class="mp-input-group">
+                    <label>Password</label>
+                    <input type="password" id="joinPassword" placeholder="Password room (jika ada)" maxlength="20">
+                </div>
+                <button class="menu-btn primary" onclick="joinRoom()">
+                    <span class="btn-icon">🔗</span> GABUNG
+                </button>
+                <div id="joinStatus" class="mp-status"></div>
+            </div>
+
+            <!-- Waiting Room -->
+            <div id="mpWaiting" class="mp-panel" style="display:none;">
+                <h3>MENUNGGU PEMAIN</h3>
+                <div class="mp-players" id="mpPlayerList"></div>
+                <p class="mp-hint">Kode Room: <strong id="waitingRoomCode">------</strong></p>
+                <p class="mp-hint">Bagikan kode ini ke temanmu!</p>
+                <div class="mp-players-count" id="playersCount">1/4 pemain</div>
+                <button class="menu-btn primary" id="startMultiBtn" onclick="startMultiplayerGame()" style="display:none;">
+                    <span class="btn-icon">▶</span> MULAI (2+ pemain)
+                </button>
+                <button class="back-btn" onclick="leaveRoom()">← BATAL</button>
+            </div>
+
+            <button class="back-btn" onclick="showModeSelect()">← KEMBALI</button>
+        </div>
+    </div>
+
+    <!-- ========== GAME OVERLAY ========== -->
+    <div id="gameOverlay">
+        <div id="hud">
+            <div class="hud-left">
+                <div class="hud-lives" id="livesDisplay">❤️❤️❤️</div>
+                <div class="hud-score" id="scoreDisplay">Skor: 0</div>
+            </div>
+            <div class="hud-center">
+                <div class="hud-distance" id="distanceDisplay">0 m</div>
+            </div>
+            <div class="hud-right">
+                <button class="hud-btn" onclick="togglePause()" title="Pause">⏸</button>
+                <button class="hud-btn" onclick="toggleMusic()" title="Musik">🎵</button>
+            </div>
+        </div>
+
+        <!-- Countdown -->
+        <div id="countdownOverlay" class="overlay-hidden">
+            <div class="countdown-number" id="countdownNum">3</div>
+        </div>
+
+        <!-- Voice indicator -->
+        <div id="voiceIndicator" class="overlay-hidden">
+            <div class="voice-pulse"></div>
+            <span id="voiceText">🎤 Dengarkan teksnya...</span>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pauseMenu" class="overlay-hidden">
+            <div class="pause-container">
+                <h2>PAUSE</h2>
+                <button class="menu-btn primary" onclick="resumeGame()">▶ LANJUTKAN</button>
+                <button class="menu-btn" onclick="showMainMenu()">🏠 MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="gameOverScreen" class="overlay-hidden">
+            <div class="gameover-container">
+                <h2>GAME OVER</h2>
+                <div class="gameover-stats">
+                    <p>Skor: <span id="finalScore">0</span></p>
+                    <p>Jarak: <span id="finalDistance">0</span> m</p>
+                </div>
+                <div class="gameover-input">
+                    <input type="text" id="playerName" placeholder="Nama kamu" maxlength="12">
+                </div>
+                <button class="menu-btn primary" onclick="saveScoreAndRestart()">💾 SIMPAN & MAIN LAGI</button>
+                <button class="menu-btn" onclick="watchAd()">📺 TONTON IKLAN (+1 Nyawa)</button>
+                <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- Win Screen (Multiplayer) -->
+        <div id="winScreen" class="overlay-hidden">
+            <div class="gameover-container win">
+                <h2>🏆 SELESAI! 🏆</h2>
+                <div class="gameover-stats" id="multiplayerResults"></div>
+                <button class="menu-btn primary" onclick="showMainMenu()">🏠 MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== LEADERBOARD ========== -->
+    <div id="leaderboardScreen" class="screen">
+        <div class="lb-container">
+            <h2>🏆 LEADERBOARD</h2>
+            <div class="lb-tabs">
+                <button class="lb-tab active" onclick="switchLbTab('local')" id="lbTabLocal">LOKAL</button>
+                <button class="lb-tab" onclick="switchLbTab('global')" id="lbTabGlobal">GLOBAL</button>
+            </div>
+            <div class="lb-list" id="leaderboardList">
+                <div class="lb-empty">Belum ada skor. Ayo main!</div>
+            </div>
+            <button class="back-btn" onclick="hideLeaderboard()">← KEMBALI</button>
+        </div>
+    </div>
+
+    <!-- ========== SETTINGS ========== -->
+    <div id="settingsScreen" class="screen">
+        <div class="settings-container">
+            <h2>⚙ SETTINGS</h2>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <span class="setting-label">🎵 Musik</span>
+                    <span class="setting-desc">Musik latar belakang</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="musicToggle" checked onchange="toggleMusicSetting()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <span class="setting-label">🔊 SFX</span>
+                    <span class="setting-desc">Efek suara</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="sfxToggle" checked onchange="toggleSfxSetting()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <span class="setting-label">🎤 Sensitivitas Mikrofon</span>
+                    <span class="setting-desc">Seberapa ketat pencocokan suara</span>
+                </div>
+                <div class="setting-slider">
+                    <input type="range" id="micSensitivity" min="0.3" max="1.0" step="0.1" value="0.7" onchange="updateMicSensitivity()">
+                    <span id="micSensValue">70%</span>
+                </div>
+            </div>
+            <div class="setting-item danger">
+                <div class="setting-info">
+                    <span class="setting-label">⚠ Reset Data</span>
+                    <span class="setting-desc">Hapus semua skor dan progress</span>
+                </div>
+                <button class="danger-btn" onclick="resetAllData()">RESET</button>
+            </div>
+            <button class="back-btn" onclick="hideSettings()">← KEMBALI</button>
+        </div>
+    </div>
+
+    <!-- ========== EXIT CONFIRM ========== -->
+    <div id="exitConfirm" class="overlay-hidden">
+        <div class="confirm-dialog">
+            <h3>Yakin mau keluar?</h3>
+            <p>Progress akan disimpan.</p>
+            <div class="confirm-buttons">
+                <button class="menu-btn primary" onclick="confirmExit()">YA, KELUAR</button>
+                <button class="menu-btn" onclick="cancelExit()">BATAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MIC PERMISSION OVERLAY ========== -->
+    <div id="micPermissionOverlay" class="overlay-hidden">
+        <div class="confirm-dialog mic-dialog">
+            <div class="mic-icon">🎤</div>
+            <h3>Akses Mikrofon Diperlukan</h3>
+            <p>Voice Runner perlu akses mikrofon untuk fitur Voice Challenge!</p>
+            <p class="mic-detail">Bacakan teks yang muncul di atas lubang untuk mengisinya.</p>
+            <div class="confirm-buttons">
+                <button class="menu-btn primary" onclick="Game.allowMic()">
+                    <span class="btn-icon">✅</span> IZINKAN
+                </button>
+                <button class="menu-btn" onclick="Game.denyMic()">
+                    <span class="btn-icon">❌</span> LEWATKAN
+                </button>
+            </div>
+            <p class="ad-note">Kamu bisa mengubah izin ini kapan saja di Settings browser.</p>
+        </div>
+    </div>
+
+    <!-- ========== AD PLACEHOLDER ========== -->
+    <div id="adPlaceholder" class="overlay-hidden">
+        <div class="confirm-dialog">
+            <h3>📺 IKLAN</h3>
+            <p>Iklan akan ditampilkan di sini.</p>
+            <p class="ad-note">(Integrasi AdNetwork menyusul)</p>
+            <button class="menu-btn primary" onclick="closeAd()">TUTUP</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- Game Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/multiplayer.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

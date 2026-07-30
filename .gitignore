@@ -1,0 +1,22 @@
+# File system artifacts
+nul
+NUL
+*.swp
+*.swo
+*~
+
+# Design references (not game assets)
+New folder/
+
+# OS files
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Logs
+*.log
