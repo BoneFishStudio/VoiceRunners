@@ -177,7 +177,7 @@ jobs:
             
             | Platform | File |
             |----------|------|
-            | 🌐 Web | [Vercel](${{ steps.deploy_url.outputs.url || '#' }) |
+            | 🌐 Web | [Vercel](${{ steps.deploy_url.outputs.url || '#' }}) |
             | 🪟 Windows | VoiceRunner-Setup-*.exe (lihat Assets bawah) |
             | 📦 Itch.io | ZIP game (lihat Assets bawah) |
             
