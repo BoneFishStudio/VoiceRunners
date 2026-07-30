@@ -52,6 +52,8 @@ const Game = {
     pits: [],
     floatingTexts: [],
     particles: [],
+    jumpTrail: [], // Jejak karakter saat lompat
+    scorePopups: [], // Floating score text (+10, +50)
     
     // Game stats
     score: 0,
@@ -68,16 +70,26 @@ const Game = {
     lastObstacleDist: 0,
     frameCount: 0,
     
-    // Game input lock (cegah jump sebelum game benar2 mulai)
-    gameInputEnabled: false,
-    keysPressed: {},
-    
+
     // Voice
     currentVoiceText: null,
     activePit: null,
     isListening: false,
     recognition: null,
     micPermissionChecked: false,
+    
+    // Voice volume jump system (continuous mic monitoring)
+    voiceAnalyser: null,
+    voiceDataArray: null,
+    voiceMicStream: null,
+    voiceJumpCooldown: 0,
+    voiceVolume: 0,
+    voiceEnabled: false,
+    
+    // Checkpoint system
+    checkpointDistance: 0,
+    checkpointScore: 0,
+    checkpointLives: 3,
     
     // Countdown
     countdownValue: 3,
@@ -123,24 +135,50 @@ const Game = {
         // Start loading animation
         this.animateLoadingCharacter();
         
-        // Animate menu character
-        this.animateMenuCharacter();
+        // Start menu demo (game preview di background)
+        this.startMenuDemo();
         
         // Input handlers
         this.setupInput();
         
         // Mulai musik untuk Main Menu
+        // Note: AudioContext butuh interaksi user dulu (click/tap)
+        // jadi musik akan mulai setelah user klik pertama
         this.startMusic();
+        
+        // Resume audio context saat user pertama kali klik di mana saja
+        document.addEventListener('click', () => {
+            if (AudioManager.audioContext && AudioManager.audioContext.state === 'suspended') {
+                AudioManager.audioContext.resume();
+            }
+        }, { once: true });
         
         console.log('Voice Runner initialized!');
     },
     
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.player.groundY = this.canvas.height * GROUND_Y_RATIO;
+        // Gunakan device pixel ratio untuk canvas sharp di layar HD/Retina
+        const dpr = window.devicePixelRatio || 1;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
         
-        if (this.state === 'solo' || this.state === 'multiplayer' || this.state === 'paused') {
+        // Set canvas buffer size ke physical pixels (sharp!)
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        // Set CSS size ke logical pixels (tampilan normal)
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+        
+        // Reset transform, lalu set scale DPR (setTransform = reset dulu, tidak kumulatif)
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        
+        // Simpan ukuran logical untuk rendering
+        this._w = w;
+        this._h = h;
+        
+        this.player.groundY = h * GROUND_Y_RATIO;
+        
+        if (this.state === 'solo' || this.state === 'multiplayer' || this.state === 'paused' || this.state === 'menu') {
             this.player.y = this.player.groundY;
         }
     },
@@ -151,7 +189,7 @@ const Game = {
         for (let i = 0; i < 100; i++) {
             this.bgStars.push({
                 x: Math.random() * 2000,
-                y: Math.random() * this.canvas.height * 0.6,
+                y: Math.random() * this.logicalH * 0.6,
                 size: Math.random() * 2 + 0.5,
                 brightness: Math.random() * 0.5 + 0.3,
                 twinkleSpeed: Math.random() * 0.02 + 0.01
@@ -225,193 +263,152 @@ const Game = {
     },
     
     setupInput() {
-        // Track key states untuk cegah jump bug
-        this.keysPressed = {};
-        
-        // Keyboard
+        // Voice Runner — hanya voice yang kontrol game!
+        // Keyboard hanya untuk pause
         document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' || e.code === 'ArrowUp') {
-                e.preventDefault();
-                if (this.keysPressed[e.code]) return; // Ignore repeat
-                this.keysPressed[e.code] = true;
-                if ((this.state === 'solo' || this.state === 'multiplayer') && this.gameInputEnabled) {
-                    this.startJump();
-                }
-            }
             if (e.code === 'Escape') {
                 if (this.state === 'solo' || this.state === 'multiplayer') {
                     this.togglePause();
                 }
             }
         });
-        
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space' || e.code === 'ArrowUp') {
-                e.preventDefault();
-                this.keysPressed[e.code] = false;
-                if ((this.state === 'solo' || this.state === 'multiplayer') && this.gameInputEnabled) {
-                    this.releaseJump();
-                }
-            }
-        });
-        
-        // Touch / Mouse (for canvas) - hanya proses saat gameInputEnabled
-        this.canvas.addEventListener('mousedown', () => {
-            if ((this.state === 'solo' || this.state === 'multiplayer') && this.gameInputEnabled) {
-                this.startJump();
-            }
-        });
-        
-        this.canvas.addEventListener('mouseup', () => {
-            if (this.gameInputEnabled) {
-                this.releaseJump();
-            }
-        });
-        
-        this.canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if ((this.state === 'solo' || this.state === 'multiplayer') && this.gameInputEnabled) {
-                this.startJump();
-            }
-        });
-        
-        this.canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (this.gameInputEnabled) {
-                this.releaseJump();
-            }
-        });
     },
     
-    // ===== ANIMASI KARAKTER DI MENU =====
+    // ===== MENU DEMO MODE (game preview di background) =====
     
-    animateMenuCharacter() {
-        // Prevent multiple animation loops
-        if (this._menuAnimRunning) return;
-        this._menuAnimRunning = true;
+    startMenuDemo() {
+        // Reset ke kondisi demo
+        this.state = 'menu';
+        this.resetGame();
+        this.speed = BASE_SPEED * 0.7; // Lebih lambat untuk demo
+        this.gameSpeed = this.speed;
         
-        const menuCanvas = document.getElementById('menuCharacterCanvas');
-        if (!menuCanvas) return;
-        const ctx = menuCanvas.getContext('2d');
-        let frame = 0;
+        // Generate background jika belum
+        if (this.bgStars.length === 0) {
+            this.generateBackground();
+        }
         
-        const animate = () => {
-            // Stop if menu not active
-            const menu = document.getElementById('mainMenu');
-            if (!menu || !menu.classList.contains('active')) return;
-            
-            const w = menuCanvas.width = menuCanvas.clientWidth;
-            const h = menuCanvas.height = menuCanvas.clientHeight;
-            ctx.clearRect(0, 0, w, h);
-            
-            // Ground line
-            const groundY = h * 0.8;
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(0, groundY);
-            ctx.lineTo(w, groundY);
-            ctx.stroke();
-            
-            // Stars
-            if (!this._menuStars) {
-                this._menuStars = [];
-                for (let i = 0; i < 40; i++) {
-                    this._menuStars.push({
-                        x: Math.random() * w,
-                        y: Math.random() * h * 0.6,
-                        s: Math.random() * 1.5 + 0.5,
-                        b: Math.random() * 0.3 + 0.1
-                    });
-                }
-            }
-            
-            for (const star of this._menuStars) {
-                const twinkle = 0.5 + Math.sin(frame * 0.05 + star.x) * 0.3;
-                ctx.globalAlpha = star.b * twinkle;
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.s, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.globalAlpha = 1;
-            
-            // Draw running character (more detailed for menu)
-            const cx = w * 0.5;
-            const cy = groundY;
-            const runCycle = (frame / 8) * Math.PI * 2;
-            const bounce = Math.abs(Math.sin(runCycle)) * 5;
-            const legSwing = Math.sin(runCycle) * 12;
-            const armSwing = Math.sin(runCycle + Math.PI) * 10;
-            
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(255,255,255,0.2)';
-            ctx.shadowBlur = 20;
-            
-            // Body
-            ctx.fillRect(cx - 6, cy - 50 + bounce, 12, 22);
-            
-            // Head
-            ctx.beginPath();
-            ctx.arc(cx, cy - 58 + bounce, 10, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Arms
-            ctx.save();
-            ctx.translate(cx - 5, cy - 44 + bounce);
-            ctx.rotate(armSwing * 0.03);
-            ctx.fillRect(-12, 0, 5, 15);
-            ctx.restore();
-            ctx.save();
-            ctx.translate(cx + 5, cy - 44 + bounce);
-            ctx.rotate(-armSwing * 0.03);
-            ctx.fillRect(7, 0, 5, 15);
-            ctx.restore();
-            
-            // Legs
-            ctx.save();
-            ctx.translate(cx - 4, cy - 28 + bounce);
-            ctx.rotate(legSwing * 0.04);
-            ctx.fillRect(-6, 0, 5, 18);
-            ctx.restore();
-            ctx.save();
-            ctx.translate(cx + 4, cy - 28 + bounce);
-            ctx.rotate(-legSwing * 0.04);
-            ctx.fillRect(1, 0, 5, 18);
-            ctx.restore();
-            
-            // Speed trail
-            for (let i = 1; i <= 3; i++) {
-                ctx.globalAlpha = 0.15 / i;
-                ctx.fillRect(cx - 20 - i * 10 + Math.sin(runCycle + i) * 5, cy - 5 + Math.random() * 10, 8, 3);
-            }
-            ctx.globalAlpha = 1;
-            ctx.shadowBlur = 0;
-            
-            frame = (frame + 1) % 16;
-            requestAnimationFrame(animate);
-        };
+        // Pastikan player di ground
+        this.player.y = this.player.groundY;
+        this.player.isJumping = false;
         
-        animate();
+        // Mulai demo loop
+        this._demoRunning = true;
+        this._demoJumpTimer = 0;
+        this._lastDemoJump = 0;
+        this.menuDemoLoop();
     },
     
-    _menuAnimRunning: false,
+    menuDemoLoop() {
+        if (this.state !== 'menu' || !this._demoRunning) return;
+        
+        this.frameCount++;
+        
+        // Scroll ground
+        this.groundX -= this.gameSpeed;
+        if (this.groundX <= -20) this.groundX += 20;
+        
+        // Update background
+        this.updateMountains();
+        this.distance += this.gameSpeed * 0.05;
+        
+        // Auto-jump logic
+        const p = this.player;
+        if (p.y >= p.groundY && !p.isJumping) {
+            // Lompat periodik untuk variasi
+            this._demoJumpTimer++;
+            if (this._demoJumpTimer > 60 + Math.random() * 40) {
+                this._demoJumpTimer = 0;
+                p.isCharging = true;
+                p.jumpCharge = 0;
+                p.squash = 0.85;
+                
+                // Random delay lalu lepas
+                const chargeTime = 100 + Math.random() * 400;
+                setTimeout(() => {
+                    if (this.state === 'menu' && p.isCharging) {
+                        p.isCharging = false;
+                        p.isJumping = true;
+                        let level = 1;
+                        if (p.jumpCharge > 0.6) level = 3;
+                        else if (p.jumpCharge > 0.25) level = 2;
+                        p.jumpLevel = level;
+                        p.vy = JUMP_FORCES[level];
+                        p.stretch = 1.2;
+                        this.emitParticles(p.x, p.groundY, 3);
+                    }
+                }, chargeTime);
+            }
+        }
+        
+        // Player physics
+        if (p.y < p.groundY) {
+            p.vy += GRAVITY;
+        }
+        p.y += p.vy;
+        if (p.y >= p.groundY) {
+            p.y = p.groundY;
+            p.vy = 0;
+            p.isJumping = false;
+            p.jumpLevel = 0;
+        }
+        
+        // Running animation
+        if (!p.isJumping) {
+            p.animTimer += this.gameSpeed * 0.05;
+            if (p.animTimer > 1) {
+                p.animTimer = 0;
+                p.animFrame = (p.animFrame + 1) % 6;
+            }
+        }
+        if (p.isCharging) {
+            p.jumpCharge = Math.min(p.jumpCharge + 0.05, 1);
+            p.squash = Math.max(p.squash - 0.01, 0.85);
+        }
+        
+        // Update particles
+        this.updateParticles();
+        
+        // Stars twinkle update
+        
+        // Render
+        this.render();
+        
+        requestAnimationFrame(() => this.menuDemoLoop());
+    },
+    
+    stopMenuDemo() {
+        this._demoRunning = false;
+    },
     
     // ===== GAME LOOP =====
     
     startSolo() {
+        this.stopMenuDemo();
         this.showCanvas();
-        this.gameInputEnabled = false; // Lock input sampai countdown selesai
         this.isMultiplayer = false;
         this.resetGame();
+        
+        // Mulai voice volume detection untuk kontrol lompatan
+        // (tidak perlu await — countdown 3 detik cukup untuk mic siap)
+        this.startVoiceVolumeDetection();
+        
+        // Cek apakah perlu show instruksi
+        if (!localStorage.getItem('voiceRunner_instructionsShown')) {
+            this.showInstructions();
+            return;
+        }
+        
         this.startCountdown();
     },
     
     startMultiplayer() {
+        this.stopMenuDemo();
         this.showCanvas();
-        this.gameInputEnabled = false; // Lock input sampai countdown selesai
         this.isMultiplayer = true;
         this.resetGame();
+        // Mulai voice volume detection (countdown 3s cukup untuk mic siap)
+        this.startVoiceVolumeDetection();
         this.startCountdown();
     },
     
@@ -422,6 +419,8 @@ const Game = {
         document.getElementById('pauseMenu').classList.add('overlay-hidden');
         document.getElementById('gameOverScreen').classList.add('overlay-hidden');
         document.getElementById('winScreen').classList.add('overlay-hidden');
+        document.getElementById('instructionsOverlay').classList.add('overlay-hidden');
+        document.getElementById('instructionsOverlay').classList.remove('overlay-active');
     },
     
     resetGame() {
@@ -439,6 +438,8 @@ const Game = {
         this.pits = [];
         this.floatingTexts = [];
         this.particles = [];
+        this.jumpTrail = [];
+        this.scorePopups = [];
         
         this.score = 0;
         this.distance = 0;
@@ -453,6 +454,10 @@ const Game = {
         this.currentVoiceText = null;
         this.activePit = null;
         this.isListening = false;
+        
+        // Reset voice state
+        this.voiceVolume = 0;
+        this.voiceJumpCooldown = 0;
         
         this.updateHUD();
     },
@@ -473,7 +478,7 @@ const Game = {
     },
     
     gameLoop(timestamp) {
-        if (this.state === 'menu' || this.state === 'loading' || this.state === 'modeSelect') return;
+        if (this.state === 'loading' || this.state === 'modeSelect' || this.state === 'menu') return;
         
         // Handle countdown
         if (this.countdownValue > 0) {
@@ -490,9 +495,6 @@ const Game = {
                     setTimeout(() => {
                         document.getElementById('countdownOverlay').classList.add('overlay-hidden');
                         this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
-                        this.gameInputEnabled = true; // Unlock input setelah countdown selesai!
-                        // Reset key states
-                        this.keysPressed = {};
                         // Start sending updates if multiplayer
                         if (this.isMultiplayer) {
                             this.mpUpdateInterval = setInterval(() => this.sendMPUpdate(), 100);
@@ -550,11 +552,18 @@ const Game = {
         // Generate obstacles
         this.generateObstacles();
         
-        // Update obstacles
+        // Voice jump — suara pemain tentukan tinggi lompatan!
+        // Dipanggil SEBELUM updateObstacles biar lompat duluan sebelum tabrakan!
+        this.voiceJumpCheck();
+        
+        // Update obstacles (move + check collision)
         this.updateObstacles();
         
         // Update pits
         this.updatePits();
+        
+        // Check for pit collision
+        this.checkPitCollision();
         
         // Update floating texts
         this.updateFloatingTexts();
@@ -565,9 +574,6 @@ const Game = {
         // Update background mountains
         this.updateMountains();
         
-        // Check for pit collision
-        this.checkPitCollision();
-        
         // Shake decay
         if (this.shakeAmount > 0) {
             this.shakeAmount *= this.shakeDecay;
@@ -577,12 +583,18 @@ const Game = {
         // Update score (based on distance)
         this.score = Math.floor(this.distance * 2 + this.frameCount * 0.5);
         
+        // Checkpoint otomatis setiap 500m
+        if (this.distance > this.checkpointDistance + 500) {
+            this.saveCheckpoint();
+        }
+        
         // Update HUD
         this.updateHUD();
     },
     
     updatePlayer() {
         const p = this.player;
+        const wasInAir = p.y < p.groundY;
         
         // Gravity
         if (p.y < p.groundY) {
@@ -591,8 +603,30 @@ const Game = {
         
         p.y += p.vy;
         
+        // Jump trail — tambah jejak setiap beberapa frame saat di udara atau lompat
+        if ((p.y < p.groundY || p.isJumping) && this.frameCount % 2 === 0) {
+            this.jumpTrail.push({
+                x: p.x,
+                y: p.y,
+                vy: p.vy,
+                life: 1,
+                squash: p.squash,
+                stretch: p.stretch
+            });
+            // Batasi jumlah trail biar gak overload
+            if (this.jumpTrail.length > 15) {
+                this.jumpTrail.shift();
+            }
+        }
+        
         // Ground collision
         if (p.y >= p.groundY) {
+            // Landing detection — kalau sebelumnya di udara
+            if (wasInAir) {
+                // Landing splash effect
+                this.emitLandingSplash(p.x, p.groundY);
+            }
+            
             p.y = p.groundY;
             p.vy = 0;
             p.isJumping = false;
@@ -626,41 +660,54 @@ const Game = {
         if (p.isCharging) {
             p.jumpCharge = Math.min(p.jumpCharge + 0.05, 1);
         }
-    },
-    
-    startJump() {
-        const p = this.player;
-        if (p.y >= p.groundY && !p.isJumping) {
-            p.isCharging = true;
-            p.jumpCharge = 0;
-            // Squash before jump
-            p.squash = 0.85;
+        
+        // Update jump trail
+        for (let i = this.jumpTrail.length - 1; i >= 0; i--) {
+            const t = this.jumpTrail[i];
+            t.life -= 0.04;
+            t.y += t.vy * 0.2;
+            if (t.life <= 0) {
+                this.jumpTrail.splice(i, 1);
+            }
+        }
+        
+        // Update score popups
+        for (let i = this.scorePopups.length - 1; i >= 0; i--) {
+            const s = this.scorePopups[i];
+            s.y -= 1.5;
+            s.life -= 0.015;
+            if (s.life <= 0) {
+                this.scorePopups.splice(i, 1);
+            }
         }
     },
     
-    releaseJump() {
-        const p = this.player;
-        if (p.isCharging && p.y >= p.groundY && !p.isJumping) {
-            p.isCharging = false;
-            p.isJumping = true;
-            
-            // Determine jump level based on charge time
-            let level = 1;
-            if (p.jumpCharge > 0.6) level = 3;
-            else if (p.jumpCharge > 0.25) level = 2;
-            
-            p.jumpLevel = level;
-            p.vy = JUMP_FORCES[level];
-            
-            // Stretch on jump
-            p.stretch = 1.2;
-            
-            AudioManager.playSFX('jump');
-            
-            // Jump particles
-            this.emitParticles(p.x, p.groundY, 5);
+    emitLandingSplash(x, y) {
+        // Ring effect — partikel melingkar
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * 3,
+                vy: Math.sin(angle) * 2 - 1,
+                life: 1,
+                decay: 0.04 + Math.random() * 0.03,
+                size: 2 + Math.random() * 3
+            });
         }
-        p.isCharging = false;
+        // Debu di tanah
+        for (let i = 0; i < 4; i++) {
+            this.particles.push({
+                x: x + (Math.random() - 0.5) * 20,
+                y: y,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 2,
+                life: 0.8,
+                decay: 0.03 + Math.random() * 0.02,
+                size: 3 + Math.random() * 3
+            });
+        }
     },
     
     // ===== OBSTACLES =====
@@ -693,31 +740,55 @@ const Game = {
         return false;
     },
     
+    get logicalW() { return this._w || this.canvas.width / (window.devicePixelRatio || 1); },
+    get logicalH() { return this._h || this.canvas.height / (window.devicePixelRatio || 1); },
+    
     createObstacle() {
-        const height = Math.random();
+        // Pilih type dulu, baru tentukan tinggi berdasarkan type
+        // Setiap type punya tinggi spesifik yang cocok dengan level suara:
+        //   Type 1 (Spike, merah):  rendah → butuh suara pelan  → level 1
+        //   Type 0 (Box, oranye):   sedang → butuh suara normal → level 2
+        //   Type 2 (Pillar, ungu):  tinggi  → butuh suara keras  → level 3
+        const typeWeights = [0.35, 0.35, 0.3]; // box, spike, pillar
+        const rand = Math.random();
+        let type;
+        if (rand < typeWeights[0]) type = 0;       // Box (sedang)
+        else if (rand < typeWeights[0] + typeWeights[1]) type = 1; // Spike (rendah)
+        else type = 2; // Pillar (tinggi)
+        
         let obsHeight, obsY;
         
-        if (height < 0.33) {
-            // Low obstacle
-            obsHeight = 20 + Math.random() * 10;
-            obsY = this.player.groundY - obsHeight;
-        } else if (height < 0.66) {
-            // Medium obstacle
-            obsHeight = 35 + Math.random() * 10;
-            obsY = this.player.groundY - obsHeight;
-        } else {
-            // High obstacle
-            obsHeight = 50 + Math.random() * 10;
-            obsY = this.player.groundY - obsHeight;
+        switch(type) {
+            case 0: // Box — butuh suara normal (level 2)
+                obsHeight = 35 + Math.random() * 10; // 35-45px
+                break;
+            case 1: // Spike — butuh suara pelan (level 1)
+                obsHeight = 22 + Math.random() * 8; // 22-30px
+                break;
+            case 2: // Pillar — butuh suara keras (level 3)
+                obsHeight = 55 + Math.random() * 10; // 55-65px
+                break;
+        }
+        
+        obsY = this.player.groundY - obsHeight;
+        
+        // Lebar disesuaikan dengan type
+        let obsWidth;
+        switch(type) {
+            case 0: obsWidth = 18 + Math.random() * 8; break;  // Box: 18-26
+            case 1: obsWidth = 16 + Math.random() * 6; break;  // Spike: 16-22
+            case 2: obsWidth = 20 + Math.random() * 8; break;  // Pillar: 20-28
         }
         
         this.obstacles.push({
-            x: this.canvas.width + 50,
+            x: this.logicalW + 50,
             y: obsY,
-            width: 15 + Math.random() * 10,
+            width: obsWidth,
             height: obsHeight,
-            type: Math.floor(Math.random() * 3), // 0: box, 1: spike, 2: pillar
-            passed: false
+            type: type,
+            passed: false,
+            // Label voice level untuk ditampilkan (opsional)
+            voiceLevel: type === 0 ? 2 : type === 1 ? 1 : 3
         });
     },
     
@@ -731,7 +802,7 @@ const Game = {
         const text = textOptions[Math.floor(Math.random() * textOptions.length)];
         
         this.activePit = {
-            x: this.canvas.width + 50,
+            x: this.logicalW + 50,
             width: pitWidth,
             text: text,
             active: true,
@@ -741,8 +812,8 @@ const Game = {
         
         // Create floating text with animation properties
         this.floatingTexts.push({
-            x: this.canvas.width + 50 + pitWidth / 2,
-            y: this.canvas.height * 0.4,
+            x: this.logicalW + 50 + pitWidth / 2,
+            y: this.logicalH * 0.4,
             text: text,
             opacity: 1,
             scale: 1,
@@ -777,6 +848,14 @@ const Game = {
                 obs.passed = true;
                 this.score += 10;
                 AudioManager.playSFX('score');
+                // Score popup
+                this.scorePopups.push({
+                    x: obs.x + obs.width / 2,
+                    y: this.player.groundY - 60,
+                    text: '+10',
+                    life: 1,
+                    scale: 0.5
+                });
             }
             
             // Remove if off screen
@@ -799,6 +878,320 @@ const Game = {
                 try { this.recognition.stop(); } catch(e) {}
             }
             document.getElementById('voiceIndicator').classList.add('overlay-hidden');
+        }
+    },
+    
+    // ===== VOICE VOLUME JUMP SYSTEM =====
+    // Voice volume → tinggi lompatan!
+    // Pelan = loncat rendah, Keras = loncat tinggi
+    
+    voiceJumpCheck() {
+        const p = this.player;
+        // Jangan lompat lagi kalau sedang di udara
+        if (p.isJumping || p.y < p.groundY || p.isCharging) return;
+        
+        // Cooldown antar lompatan
+        if (this.voiceJumpCooldown > 0) {
+            this.voiceJumpCooldown--;
+            return;
+        }
+        
+        // Baca volume suara dari mic
+        const volume = this.getVoiceVolume();
+        this.voiceVolume = volume;
+        
+        // Threshold: minimal volume untuk trigger lompat
+        // 0.0-0.06 = silent/ambient noise
+        // 0.06-0.12 = quiet → level 1 (spike)
+        // 0.12-0.25 = normal → level 2 (box)
+        // 0.25+ = loud → level 3 (pillar)
+        
+        if (volume > 0.06) {
+            let level = 1;
+            if (volume > 0.12) level = 2;
+            if (volume > 0.25) level = 3;
+            
+            this.performVoiceJump(level);
+            this.voiceJumpCooldown = 15;
+            
+            // Feedback visual: volume meter
+            this.showVolumeFeedback(volume, level);
+        }
+        
+        // Fallback: kalau voice tidak aktif, tetap pakai auto-jump
+        if (!this.voiceEnabled && !p.isJumping && p.y >= p.groundY) {
+            this.fallbackAutoJump();
+        }
+    },
+    
+    performVoiceJump(level) {
+        const p = this.player;
+        p.isJumping = true;
+        p.jumpLevel = level;
+        p.vy = JUMP_FORCES[level];
+        p.stretch = 1.2;
+        p.squash = 0.9;
+        AudioManager.playSFX('jump');
+        this.emitParticles(p.x, p.groundY, 3);
+        
+        // Visual: level indicator di karakter
+        this.scorePopups.push({
+            x: p.x,
+            y: p.groundY - 80,
+            text: level === 1 ? '🔇 Pelan' : level === 2 ? '🗣️ Normal' : '📢 KERAS!',
+            life: 0.8,
+            scale: 0.4
+        });
+    },
+    
+    showVolumeFeedback(volume, level) {
+        // Update volume bar di HUD kalau ada
+        const bar = document.getElementById('volumeBar');
+        if (bar) {
+            bar.style.width = Math.min(volume * 100, 100) + '%';
+            if (level === 3) bar.style.background = '#ff4444';
+            else if (level === 2) bar.style.background = '#ffaa00';
+            else bar.style.background = '#44ff44';
+        }
+        
+        // Update label volume
+        const label = document.getElementById('volumeLabel');
+        if (label) {
+            if (volume > 0.25) label.textContent = '📢 KERAS!';
+            else if (volume > 0.12) label.textContent = '🗣️ Normal';
+            else if (volume > 0.06) label.textContent = '🔇 Pelan';
+            else label.textContent = '🔇 ...';
+        }
+    },
+    
+    // Fallback auto-jump kalau mic tidak aktif
+    fallbackAutoJump() {
+        const p = this.player;
+        for (const obs of this.obstacles) {
+            if (obs.passed) continue;
+            const dist = obs.x - p.x;
+            if (dist > 0 && dist < 90) {
+                let level = 1;
+                if (obs.height > 40) level = 2;
+                if (obs.height > 55) level = 3;
+                p.isJumping = true;
+                p.jumpLevel = level;
+                p.vy = JUMP_FORCES[level];
+                p.stretch = 1.2;
+                p.squash = 0.9;
+                return;
+            }
+        }
+    },
+    
+    // ===== VOICE VOLUME DETECTION (mic continuous) =====
+    
+    async startVoiceVolumeDetection() {
+        // Cek localStorage dulu — minta izin cuma 1x!
+        const micPerm = localStorage.getItem('voiceRunner_micPermission');
+        if (micPerm === 'denied') {
+            this.voiceEnabled = false;
+            console.log('Mic permission was denied, using fallback');
+            return false;
+        }
+        
+        try {
+            // Pastikan AudioContext ada
+            if (!AudioManager.audioContext) {
+                AudioManager.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (AudioManager.audioContext.state === 'suspended') {
+                await AudioManager.audioContext.resume();
+            }
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Simpan izin — browser tidak akan minta lagi!
+            localStorage.setItem('voiceRunner_micPermission', 'granted');
+            
+            this.voiceMicStream = stream;
+            const source = AudioManager.audioContext.createMediaStreamSource(stream);
+            this.voiceAnalyser = AudioManager.audioContext.createAnalyser();
+            this.voiceAnalyser.fftSize = 256;
+            source.connect(this.voiceAnalyser);
+            this.voiceDataArray = new Uint8Array(this.voiceAnalyser.frequencyBinCount);
+            
+            this.voiceEnabled = true;
+            console.log('🎤 Voice volume detection started!');
+            return true;
+        } catch(e) {
+            console.warn('Mic access failed:', e.message);
+            localStorage.setItem('voiceRunner_micPermission', 'denied');
+            this.voiceEnabled = false;
+            return false;
+        }
+    },
+    
+    stopVoiceVolumeDetection() {
+        if (this.voiceMicStream) {
+            this.voiceMicStream.getTracks().forEach(t => t.stop());
+            this.voiceMicStream = null;
+        }
+        this.voiceAnalyser = null;
+        this.voiceDataArray = null;
+        this.voiceVolume = 0;
+    },
+    
+    getVoiceVolume() {
+        if (!this.voiceAnalyser || !this.voiceDataArray) return 0;
+        try {
+            this.voiceAnalyser.getByteTimeDomainData(this.voiceDataArray);
+            let sum = 0;
+            for (let i = 0; i < this.voiceDataArray.length; i++) {
+                const value = (this.voiceDataArray[i] - 128) / 128;
+                sum += Math.abs(value);
+            }
+            return sum / this.voiceDataArray.length;
+        } catch(e) {
+            return 0;
+        }
+    },
+    
+    // ===== CHECKPOINT SYSTEM =====
+    
+    saveCheckpoint() {
+        this.checkpointDistance = Math.floor(this.distance);
+        this.checkpointScore = this.score;
+        this.checkpointLives = this.lives;
+        
+        // Simpan ke localStorage
+        const cpData = {
+            distance: this.checkpointDistance,
+            score: this.checkpointScore,
+            lives: this.checkpointLives,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('voiceRunner_checkpoint', JSON.stringify(cpData));
+        
+        // Simpan juga ke leaderboard (jarak terjauh)
+        this.saveCheckpointToLeaderboard();
+        
+        // Notifikasi visual
+        this.showCheckpointNotification();
+        AudioManager.playSFX('score');
+    },
+    
+    respawnAtCheckpoint() {
+        // Pulihkan nyawa
+        this.lives = 3;
+        // Kembali ke jarak checkpoint
+        this.distance = this.checkpointDistance;
+        this.score = this.checkpointScore;
+        
+        // Reset arena
+        this.obstacles = [];
+        this.pits = [];
+        this.activePit = null;
+        this.floatingTexts = [];
+        this.particles = [];
+        this.jumpTrail = [];
+        this.scorePopups = [];
+        this.lastObstacleDist = this.distance;
+        
+        // Reset player
+        this.player.y = this.player.groundY;
+        this.player.vy = 0;
+        this.player.isJumping = false;
+        this.player.jumpLevel = 0;
+        this.player.squash = 1;
+        
+        // Hentikan voice recognition
+        if (this.recognition) {
+            try { this.recognition.stop(); } catch(e) {}
+        }
+        this.isListening = false;
+        document.getElementById('voiceIndicator').classList.add('overlay-hidden');
+        
+        // Tampilkan notifikasi
+        this.showCheckpointNotification();
+        
+        // Update HUD
+        this.updateHUD();
+        
+        // Kembalikan state ke bermain
+        this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
+        
+        console.log('📍 Respawn at checkpoint:', this.checkpointDistance + 'm');
+    },
+    
+    showCheckpointNotification() {
+        const el = document.getElementById('checkpointNotif');
+        if (!el) return;
+        el.textContent = `📍 CHECKPOINT ${Math.floor(this.checkpointDistance)}m`;
+        el.classList.remove('overlay-hidden');
+        // Animasi CSS via class
+        el.classList.remove('cp-animate');
+        // Force reflow
+        void el.offsetWidth;
+        el.classList.add('cp-animate');
+        
+        setTimeout(() => {
+            el.classList.add('overlay-hidden');
+        }, 2000);
+    },
+    
+    saveCheckpointToLeaderboard() {
+        let leaderboard = [];
+        const saved = localStorage.getItem('voiceRunner_leaderboard');
+        if (saved) {
+            try { leaderboard = JSON.parse(saved); } catch(e) {}
+        }
+        
+        // Update atau tambah entry untuk checkpoint distance
+        const existing = leaderboard.find(e => e.type === 'checkpoint');
+        if (existing) {
+            if (this.checkpointDistance > existing.distance) {
+                existing.distance = this.checkpointDistance;
+                existing.score = this.checkpointScore;
+                existing.date = Date.now();
+            }
+        } else {
+            leaderboard.push({
+                name: '📍 Checkpoint',
+                type: 'checkpoint',
+                score: this.checkpointScore,
+                distance: this.checkpointDistance,
+                date: Date.now()
+            });
+        }
+        
+        localStorage.setItem('voiceRunner_leaderboard', JSON.stringify(leaderboard));
+    },
+    
+    // ===== INSTRUCTIONS (1x tampil + tombol ?) =====
+    
+    showInstructions() {
+        const overlay = document.getElementById('instructionsOverlay');
+        if (!overlay) return;
+        overlay.classList.remove('overlay-hidden');
+        overlay.classList.add('overlay-active');
+        
+        // Pause game jika sedang bermain
+        if (this.state === 'solo' || this.state === 'multiplayer') {
+            this.state = 'paused';
+        }
+    },
+    
+    hideInstructions() {
+        const overlay = document.getElementById('instructionsOverlay');
+        if (overlay) {
+            overlay.classList.add('overlay-hidden');
+            overlay.classList.remove('overlay-active');
+        }
+        
+        // Tandai sudah pernah lihat
+        localStorage.setItem('voiceRunner_instructionsShown', 'true');
+        
+        // Jika dari pause, kembali
+        if (this.state === 'paused') {
+            this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
+        } else {
+            // Mulai game (dari main menu)
+            this.startCountdown();
         }
     },
     
@@ -954,12 +1347,6 @@ const Game = {
     },
     
     _startListening(text) {
-        // Show voice indicator
-        const indicator = document.getElementById('voiceIndicator');
-        indicator.classList.remove('overlay-hidden');
-        document.getElementById('voiceText').textContent = '🎤 Ucapkan: "' + text + '"';
-        document.querySelector('.voice-pulse').className = 'voice-pulse listening';
-        
         // Show voice indicator
         const indicator = document.getElementById('voiceIndicator');
         indicator.classList.remove('overlay-hidden');
@@ -1143,7 +1530,7 @@ const Game = {
         for (let i = 0; i < this.bgMountains.length; i++) {
             this.bgMountains[i].x -= this.gameSpeed * 0.3;
             if (this.bgMountains[i].x + this.bgMountains[i].width < -50) {
-                this.bgMountains[i].x = this.canvas.width + Math.random() * 100;
+                this.bgMountains[i].x = this.logicalW + Math.random() * 100;
                 this.bgMountains[i].height = 60 + Math.random() * 120;
                 this.bgMountains[i].width = 200 + Math.random() * 150;
             }
@@ -1166,7 +1553,12 @@ const Game = {
         this.updateHUD();
         
         if (this.lives <= 0) {
-            this.gameOver();
+            // Cek checkpoint! Kalau ada, respawn
+            if (this.checkpointDistance > 0) {
+                this.respawnAtCheckpoint();
+            } else {
+                this.gameOver();
+            }
         }
     },
     
@@ -1183,6 +1575,9 @@ const Game = {
             try { this.recognition.stop(); } catch(e) {}
         }
         document.getElementById('voiceIndicator').classList.add('overlay-hidden');
+        
+        // Stop voice volume detection
+        this.stopVoiceVolumeDetection();
         
         // Show game over screen
         document.getElementById('finalScore').textContent = this.score;
@@ -1258,8 +1653,8 @@ const Game = {
     
     render() {
         const ctx = this.ctx;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const w = this._w || this.canvas.width;
+        const h = this._h || this.canvas.height;
         
         // Screen shake
         ctx.save();
@@ -1294,6 +1689,9 @@ const Game = {
         
         // Draw particles
         this.drawParticles(ctx);
+        
+        // Draw score popups
+        this.drawScorePopups(ctx);
         
         // Draw multiplayer players
         if (this.isMultiplayer) {
@@ -1357,45 +1755,88 @@ const Game = {
             ctx.fillRect(bx, this.player.groundY - bh, bw, bh);
         }
         ctx.restore();
+        
+        // === AMBIENT GLOW (pulsing neon dari bawah) ===
+        ctx.save();
+        const glowPulse = 0.3 + Math.sin(this.frameCount * 0.02) * 0.15;
+        const ambientGrad = ctx.createRadialGradient(
+            w * 0.5, this.player.groundY + 50, 10,
+            w * 0.5, this.player.groundY + 50, h * 0.6
+        );
+        ambientGrad.addColorStop(0, `rgba(100, 200, 255, ${glowPulse * 0.08})`);
+        ambientGrad.addColorStop(0.5, `rgba(80, 150, 255, ${glowPulse * 0.04})`);
+        ambientGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = ambientGrad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
     },
     
     drawGround(ctx, w, h) {
         const gy = this.player.groundY;
         
-        // Ground line
         ctx.save();
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        
+        // Neon glow di garis ground
+        const groundGlow = ctx.createLinearGradient(0, gy - 4, 0, gy + 4);
+        groundGlow.addColorStop(0, 'rgba(100, 200, 255, 0)');
+        groundGlow.addColorStop(0.5, 'rgba(100, 200, 255, 0.4)');
+        groundGlow.addColorStop(1, 'rgba(100, 200, 255, 0)');
+        ctx.fillStyle = groundGlow;
+        ctx.fillRect(0, gy - 4, w, 8);
+        
+        // Main ground line (neon blue)
+        ctx.shadowColor = 'rgba(100, 200, 255, 0.5)';
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(0, gy);
         ctx.lineTo(w, gy);
         ctx.stroke();
+        ctx.shadowBlur = 0;
         
-        // Ground texture
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        ctx.lineWidth = 1;
-        for (let i = -20; i < w + 20; i += 20) {
+        // Running track marks (neon)
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.12)';
+        ctx.lineWidth = 2;
+        for (let i = -30; i < w + 30; i += 30) {
             const gx = i + this.groundX;
+            const alpha = 0.05 + Math.sin(i * 0.3) * 0.03;
+            ctx.globalAlpha = alpha;
             ctx.beginPath();
-            ctx.moveTo(gx, gy);
-            ctx.lineTo(gx + 5, gy + 5);
+            ctx.moveTo(gx, gy - 2);
+            ctx.lineTo(gx + 8, gy + 6);
             ctx.stroke();
         }
+        ctx.globalAlpha = 1;
+        
+        // Track line markings (dashed guide line)
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([15, 25]);
+        ctx.beginPath();
+        ctx.moveTo(0, gy - 30);
+        ctx.lineTo(w, gy - 30);
+        ctx.stroke();
+        ctx.setLineDash([]);
         
         ctx.restore();
         
-        // Speed lines at high speed
-        if (this.gameSpeed > 8) {
+        // Speed lines at high speed (cyan/blue)
+        if (this.gameSpeed > 7) {
             ctx.save();
-            ctx.globalAlpha = (this.gameSpeed - 8) / 10 * 0.3;
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 8; i++) {
-                const lx = (Math.random() * w + this.frameCount * 5) % (w + 100) - 50;
-                const ly = Math.random() * h * 0.6;
+            const intensity = (this.gameSpeed - 7) / 7;
+            ctx.globalAlpha = intensity * 0.4;
+            for (let i = 0; i < 10 + Math.floor(intensity * 5); i++) {
+                const lx = (Math.random() * w + this.frameCount * 3) % (w + 100) - 50;
+                const ly = gy - 20 - Math.random() * h * 0.5;
+                const len = 20 + Math.random() * 40;
+                ctx.strokeStyle = `rgba(100, 200, 255, ${0.1 + Math.random() * 0.2})`;
+                ctx.lineWidth = 1 + Math.random() * 2;
+                ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
+                ctx.shadowBlur = 5;
                 ctx.beginPath();
                 ctx.moveTo(lx, ly);
-                ctx.lineTo(lx - 30 - Math.random() * 20, ly);
+                ctx.lineTo(lx - len, ly - Math.random() * 5);
                 ctx.stroke();
             }
             ctx.restore();
@@ -1409,6 +1850,25 @@ const Game = {
         
         ctx.save();
         
+        // === JUMP TRAIL (siluet di belakang karakter) ===
+        for (let i = this.jumpTrail.length - 1; i >= 0; i--) {
+            const t = this.jumpTrail[i];
+            ctx.save();
+            ctx.globalAlpha = t.life * 0.2;
+            ctx.fillStyle = '#64c8ff';
+            ctx.shadowBlur = 0;
+            const ts = 1 / t.squash * t.stretch;
+            ctx.translate(t.x, t.y);
+            ctx.scale(ts * (0.5 + t.life * 0.3), t.squash * (0.5 + t.life * 0.3));
+            // Body trail
+            ctx.fillRect(-4, -30, 8, 14);
+            // Head trail
+            ctx.beginPath();
+            ctx.arc(0, -36, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        
         // Apply squash and stretch
         const sw = 1 / p.squash * p.stretch;
         const sh = p.squash / p.stretch;
@@ -1416,93 +1876,241 @@ const Game = {
         ctx.translate(px, py);
         ctx.scale(sw, sh);
         
-        // Glow effect
-        ctx.shadowColor = 'rgba(255,255,255,0.15)';
-        ctx.shadowBlur = 15;
-        
-        // Draw running black silhouette character
-        ctx.fillStyle = '#fff';
-        
         const runCycle = p.isJumping ? 0 : (p.animFrame / 6) * Math.PI * 2;
         const bounce = p.isJumping ? 0 : Math.abs(Math.sin(runCycle)) * 3;
         const legSwing = Math.sin(runCycle) * 8;
         const armSwing = Math.sin(runCycle + Math.PI) * 8;
         
-        // Body
-        ctx.fillRect(-5, -35 + bounce, 10, 18);
+        // === RUNNING TRAIL ===
+        if (!p.isJumping) {
+            ctx.save();
+            for (let i = 1; i <= 4; i++) {
+                const trailAlpha = 0.08 / i;
+                const trailOffset = i * 10 + this.frameCount % 3;
+                ctx.globalAlpha = trailAlpha;
+                ctx.fillStyle = '#64c8ff';
+                ctx.shadowBlur = 0;
+                ctx.fillRect(-15 - trailOffset, -5 + Math.sin(runCycle + i) * 2, 6 + i * 2, 3);
+            }
+            ctx.restore();
+        }
         
-        // Head
+        // === SPEED TRAIL (saat lari kencang) ===
+        if (this.gameSpeed > 7 && !p.isJumping) {
+            ctx.save();
+            const intensity = (this.gameSpeed - 7) / 7;
+            ctx.globalAlpha = intensity * 0.3;
+            for (let i = 0; i < 3; i++) {
+                const tx = -20 - Math.random() * 30;
+                const ty = -10 + Math.random() * 20;
+                ctx.fillStyle = 'rgba(100, 200, 255, 0.5)';
+                ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(tx, ty, 2 + Math.random() * 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        
+        // === GLOW INTI ===
+        ctx.shadowColor = 'rgba(150, 220, 255, 0.4)';
+        ctx.shadowBlur = 20;
+        
+        // === BADAN (TORSO) ===
+        const gradBody = ctx.createLinearGradient(0, -35 + bounce, 0, -17 + bounce);
+        gradBody.addColorStop(0, '#8ad4ff');
+        gradBody.addColorStop(0.5, '#ffffff');
+        gradBody.addColorStop(1, '#8ad4ff');
+        ctx.fillStyle = gradBody;
+        ctx.fillRect(-6, -36 + bounce, 12, 20);
+        
+        // Detail badan — garis tengah
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.3)';
+        ctx.fillRect(-1, -34 + bounce, 2, 16);
+        
+        // === KEPALA ===
+        ctx.shadowBlur = 15;
+        const gradHead = ctx.createRadialGradient(0, -42 + bounce, 2, 0, -42 + bounce, 9);
+        gradHead.addColorStop(0, '#ffffff');
+        gradHead.addColorStop(0.7, '#c0e8ff');
+        gradHead.addColorStop(1, '#8ad4ff');
+        ctx.fillStyle = gradHead;
         ctx.beginPath();
-        ctx.arc(0, -40 + bounce, 8, 0, Math.PI * 2);
+        ctx.arc(0, -42 + bounce, 9, 0, Math.PI * 2);
         ctx.fill();
         
-        // Arms
+        // Mata (visor glow)
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.6)';
+        ctx.fillRect(-4, -44 + bounce, 8, 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(-3, -44 + bounce, 6, 1);
+        
+        // === LENGAN ===
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#8ad4ff';
+        
+        // Lengan kiri
         ctx.save();
-        ctx.translate(-3, -30 + bounce);
+        ctx.translate(-4, -32 + bounce);
         ctx.rotate(armSwing * 0.03);
-        ctx.fillRect(-9, 0, 4, 12);
+        ctx.fillRect(-10, 0, 4, 13);
+        // Tangan
+        ctx.fillStyle = '#64c8ff';
+        ctx.fillRect(-10, 11, 4, 3);
         ctx.restore();
         
+        // Lengan kanan
         ctx.save();
-        ctx.translate(3, -30 + bounce);
+        ctx.translate(4, -32 + bounce);
         ctx.rotate(-armSwing * 0.03);
-        ctx.fillRect(5, 0, 4, 12);
+        ctx.fillStyle = '#8ad4ff';
+        ctx.fillRect(6, 0, 4, 13);
+        ctx.fillStyle = '#64c8ff';
+        ctx.fillRect(6, 11, 4, 3);
         ctx.restore();
         
-        // Legs
+        // === KAKI ===
+        ctx.shadowBlur = 8;
+        
+        // Kaki kiri
         ctx.save();
-        ctx.translate(-3, -17 + bounce);
+        ctx.translate(-4, -17 + bounce);
         ctx.rotate(legSwing * 0.04);
-        ctx.fillRect(-5, 0, 4, 14);
+        ctx.fillStyle = '#7ac0ee';
+        ctx.fillRect(-5, 0, 5, 15);
+        // Sepatu
+        ctx.fillStyle = '#5ab0dd';
+        ctx.fillRect(-6, 13, 7, 4);
         ctx.restore();
         
+        // Kaki kanan
         ctx.save();
-        ctx.translate(3, -17 + bounce);
+        ctx.translate(4, -17 + bounce);
         ctx.rotate(-legSwing * 0.04);
-        ctx.fillRect(1, 0, 4, 14);
+        ctx.fillStyle = '#7ac0ee';
+        ctx.fillRect(0, 0, 5, 15);
+        ctx.fillStyle = '#5ab0dd';
+        ctx.fillRect(-1, 13, 7, 4);
         ctx.restore();
         
-        // Trail effect when running fast
-        if (this.gameSpeed > 7 && !p.isJumping) {
-            ctx.globalAlpha = 0.2 * ((this.gameSpeed - 7) / 5);
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(-15 - Math.random() * 10, -5, 5, 4);
+        // === JUMP PARTICLES (lingkaran di kaki saat lompat) ===
+        if (p.isJumping && p.vy < 0) {
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 0.3 + Math.random() * 0.2;
+            ctx.fillStyle = '#64c8ff';
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(-4 + Math.random() * 8, 2 + Math.random() * 4, 1.5 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
         }
         
         ctx.restore();
     },
     
     drawObstacles(ctx) {
+        const pulse = Math.sin(this.frameCount * 0.05) * 0.15 + 0.85; // Pulse animasi
+        
         for (const obs of this.obstacles) {
             ctx.save();
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(255,255,255,0.1)';
-            ctx.shadowBlur = 5;
+            
+            const ox = obs.x;
+            const oy = obs.y;
+            const ow = obs.width;
+            const oh = obs.height;
+            
+            // === GLOW BASE ===
+            ctx.shadowColor = 'rgba(255, 180, 100, 0.3)';
+            ctx.shadowBlur = 12;
             
             switch(obs.type) {
-                case 0: // Box
-                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    // Inner detail
-                    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                case 0: // Box — neon crate
+                    // Gradient body
+                    const boxGrad = ctx.createLinearGradient(ox, oy, ox + ow, oy + oh);
+                    boxGrad.addColorStop(0, '#ff8c42');
+                    boxGrad.addColorStop(0.5, '#ff6b35');
+                    boxGrad.addColorStop(1, '#e05220');
+                    ctx.fillStyle = boxGrad;
+                    ctx.fillRect(ox, oy, ow, oh);
+                    
+                    // Border dalam (glow line)
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = `rgba(255, 200, 150, ${0.3 * pulse})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(ox + 3, oy + 3, ow - 6, oh - 6);
+                    
+                    // X mark di tengah
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 * pulse})`;
                     ctx.lineWidth = 1;
-                    ctx.strokeRect(obs.x + 3, obs.y + 3, obs.width - 6, obs.height - 6);
+                    ctx.beginPath();
+                    ctx.moveTo(ox + 5, oy + 5);
+                    ctx.lineTo(ox + ow - 5, oy + oh - 5);
+                    ctx.moveTo(ox + ow - 5, oy + 5);
+                    ctx.lineTo(ox + 5, oy + oh - 5);
+                    ctx.stroke();
                     break;
                     
-                case 1: // Spike
+                case 1: // Spike — neon red
+                    ctx.shadowColor = 'rgba(255, 80, 80, 0.4)';
+                    const spikeGrad = ctx.createLinearGradient(ox, oy + oh, ox + ow / 2, oy);
+                    spikeGrad.addColorStop(0, '#ff4444');
+                    spikeGrad.addColorStop(0.5, '#ff6666');
+                    spikeGrad.addColorStop(1, '#ff8888');
+                    ctx.fillStyle = spikeGrad;
+                    
                     ctx.beginPath();
-                    ctx.moveTo(obs.x, obs.y + obs.height);
-                    ctx.lineTo(obs.x + obs.width / 2, obs.y);
-                    ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                    ctx.moveTo(ox, oy + oh);
+                    ctx.lineTo(ox + ow / 2, oy);
+                    ctx.lineTo(ox + ow, oy + oh);
                     ctx.closePath();
                     ctx.fill();
+                    
+                    // Glow line di tengah spike
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 * pulse})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(ox + ow / 2, oy + 3);
+                    ctx.lineTo(ox + ow / 2, oy + oh - 3);
+                    ctx.stroke();
                     break;
                     
-                case 2: // Pillar
-                    ctx.fillRect(obs.x + 2, obs.y, obs.width - 4, obs.height);
-                    // Top cap
-                    ctx.fillRect(obs.x, obs.y - 3, obs.width, 5);
+                case 2: // Pillar — neon purple
+                    ctx.shadowColor = 'rgba(180, 100, 255, 0.3)';
+                    const pillarGrad = ctx.createLinearGradient(ox + 2, oy, ox + ow - 2, oy + oh);
+                    pillarGrad.addColorStop(0, '#8b5cf6');
+                    pillarGrad.addColorStop(0.5, '#a78bfa');
+                    pillarGrad.addColorStop(1, '#7c3aed');
+                    ctx.fillStyle = pillarGrad;
+                    ctx.fillRect(ox + 2, oy, ow - 4, oh);
+                    
+                    // Top cap (glowing)
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = `rgba(167, 139, 250, ${0.6 * pulse})`;
+                    ctx.fillRect(ox, oy - 4, ow, 6);
+                    
+                    // Detail garis vertikal
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * pulse})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(ox + ow / 2, oy + 5);
+                    ctx.lineTo(ox + ow / 2, oy + oh - 5);
+                    ctx.stroke();
                     break;
             }
+            
+            // === PULSE RING (efek denyut) ===
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.05 * pulse})`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 5]);
+            ctx.strokeRect(ox - 4, oy - 4, ow + 8, oh + 8);
+            ctx.setLineDash([]);
             
             ctx.restore();
         }
@@ -1624,10 +2232,32 @@ const Game = {
         for (const p of this.particles) {
             ctx.save();
             ctx.globalAlpha = p.life;
-            ctx.fillStyle = `rgba(255,255,255,${p.life})`;
+            ctx.fillStyle = `rgba(150, 220, 255, ${p.life})`;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
+        }
+    },
+    
+    drawScorePopups(ctx) {
+        for (const s of this.scorePopups) {
+            ctx.save();
+            ctx.globalAlpha = s.life;
+            ctx.translate(s.x, s.y);
+            ctx.scale(s.scale + (1 - s.life) * 0.5, s.scale + (1 - s.life) * 0.5);
+            // Glow
+            ctx.shadowColor = 'rgba(100, 255, 100, 0.6)';
+            ctx.shadowBlur = 15;
+            ctx.font = 'bold 20px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#66ff66';
+            ctx.fillText(s.text, 0, 0);
+            // Outline
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeText(s.text, 0, 0);
             ctx.restore();
         }
     },
@@ -1836,7 +2466,7 @@ function startGame() {
 function showMainMenu() {
     // Hide all screens
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('gameCanvas').style.display = 'none';
+    document.getElementById('gameCanvas').style.display = 'block';
     document.getElementById('gameOverlay').style.display = 'none';
     document.getElementById('pauseMenu').classList.add('overlay-hidden');
     document.getElementById('gameOverScreen').classList.add('overlay-hidden');
@@ -1850,8 +2480,8 @@ function showMainMenu() {
     // Mainkan musik lagi di menu
     Game.startMusic();
     
-    // Restart animasi karakter di menu
-    setTimeout(() => { Game.animateMenuCharacter(); }, 100);
+    // Mulai demo game preview
+    Game.startMenuDemo();
     
     if (Game.mpUpdateInterval) {
         clearInterval(Game.mpUpdateInterval);
@@ -1899,12 +2529,15 @@ function updateLeaderboard(type = 'local') {
             try { leaderboard = JSON.parse(saved); } catch(e) {}
         }
         
-        if (leaderboard.length === 0) {
+        // Filter hanya entry score pemain (bukan checkpoint)
+        const scoreEntries = leaderboard.filter(e => e.type !== 'checkpoint');
+        
+        if (scoreEntries.length === 0) {
             list.innerHTML = '<div class="lb-empty">Belum ada skor. Ayo main!</div>';
             return;
         }
         
-        leaderboard.forEach((entry, index) => {
+        scoreEntries.forEach((entry, index) => {
             const div = document.createElement('div');
             div.className = 'lb-item';
             const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';

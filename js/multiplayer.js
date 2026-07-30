@@ -19,6 +19,47 @@ let firebaseApp = null;
 let database = null;
 let fbInitialized = false;
 
+// Rate limiting: cooldong 5 detik antar createRoom
+let _lastRoomCreation = 0;
+const ROOM_CREATION_COOLDOWN = 5000;
+
+/**
+ * Hash string dengan SHA-256 (client-side).
+ * Tidak 100% aman (client-side bisa dibaca), tapi jauh lebih
+ * baik daripada menyimpan password asli di database publik.
+ */
+async function sha256(message) {
+    if (!message) return '';
+    try {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+        console.warn('SHA-256 failed, falling back to simple hash:', e);
+        // Fallback sederhana kalau crypto.subtle tidak tersedia
+        // Gunakan multiple hash rounds untuk hasil yang lebih panjang
+        let h1 = 0, h2 = 0, h3 = 0, h4 = 0;
+        for (let i = 0; i < message.length; i++) {
+            const char = message.charCodeAt(i);
+            h1 = ((h1 << 5) - h1) + char;
+            h1 = h1 & h1;
+            h2 = ((h2 << 7) - h2) + (char * 3);
+            h2 = h2 & h2;
+            h3 = ((h3 << 3) - h3) + (char * 7);
+            h3 = h3 & h3;
+            h4 = ((h4 << 13) - h4) + (char * 11);
+            h4 = h4 & h4;
+        }
+        // Gabungkan jadi 64 karakter hex (sama panjang dengan SHA-256)
+        const parts = [h1, h2, h3, h4].map(n => 
+            Math.abs(n).toString(16).padStart(8, '0')
+        );
+        // parts.join('') = 32 chars, tambah 32 padding = 64 chars total
+        return parts.join('') + '00000000000000000000000000000000';
+    }
+}
+
 const Multiplayer = {
     roomRef: null,
     playerRef: null,
@@ -75,13 +116,24 @@ const Multiplayer = {
             }
         }
         
+        // Rate limiting: cegah spam pembuatan room
+        const now = Date.now();
+        if (now - _lastRoomCreation < ROOM_CREATION_COOLDOWN) {
+            const remaining = Math.ceil((ROOM_CREATION_COOLDOWN - (now - _lastRoomCreation)) / 1000);
+            this.showStatus(`Mohon tunggu ${remaining} detik sebelum membuat room lagi`, 'error');
+            return null;
+        }
+        
         this.roomCode = this.generateRoomCode();
         this.playerId = this.generatePlayerId();
         this.isHost = true;
         
+        // Hash password sebelum dikirim ke Firebase
+        const hashedPassword = await sha256(password || '');
+        
         const roomData = {
             host: this.playerId,
-            password: password || '',
+            password: hashedPassword, // Hash, bukan plaintext!
             createdAt: Date.now(),
             status: 'waiting',
             seed: Math.floor(Math.random() * 999999),
@@ -104,23 +156,15 @@ const Multiplayer = {
         roomData.playerOrder = [this.playerId];
         
         try {
+            // Set cooldown hanya saat benar-benar akan menulis ke Firebase
+            _lastRoomCreation = now;
             await database.ref('rooms/' + this.roomCode).set(roomData);
             
             this.roomRef = database.ref('rooms/' + this.roomCode);
             this.playerRef = database.ref('rooms/' + this.roomCode + '/players/' + this.playerId);
             
             // Listen for changes
-            this.roomRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data) {
-                    // Room deleted
-                    this.cleanup();
-                    return;
-                }
-                this.currentRoomData = data;
-                this.updateRoomUI(data);
-                if (this.onUpdate) this.onUpdate(data);
-            });
+            this.setupRoomListener();
             
             // Set presence - auto cleanup jika disconnect
             this.roomRef.child('players/' + this.playerId).onDisconnect().remove();
@@ -173,7 +217,9 @@ const Multiplayer = {
                 return false;
             }
             
-            if (room.password && room.password !== password) {
+            // Hash password yang dimasukkan, lalu bandingkan dengan hash di DB
+            const hashedInput = await sha256(password || '');
+            if (room.password && room.password !== hashedInput) {
                 this.showStatus('Password salah!', 'error', 'joinStatus');
                 return false;
             }
@@ -208,16 +254,7 @@ const Multiplayer = {
             });
             
             // Listen for changes
-            this.roomRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data) {
-                    this.cleanup();
-                    return;
-                }
-                this.currentRoomData = data;
-                this.updateRoomUI(data);
-                if (this.onUpdate) this.onUpdate(data);
-            });
+            this.setupRoomListener();
             
             this.roomRef.child('players/' + this.playerId).onDisconnect().remove();
             
@@ -294,6 +331,32 @@ const Multiplayer = {
         else if (panel === 'waiting') document.getElementById('mpWaiting').style.display = 'block';
     },
     
+    setupRoomListener() {
+        if (!this.roomRef) return;
+        this.roomRef.off(); // Hapus listener lama biar ganda
+        this.roomRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) {
+                this.cleanup();
+                return;
+            }
+            this.currentRoomData = data;
+            this.updateRoomUI(data);
+            
+            // ✅ Deteksi game dimulai oleh host!
+            if (data.status === 'playing' && !this.gameStarted && !this.isHost) {
+                this.gameStarted = true;
+                // Sembunyikan multiplayer screen, mulai game
+                document.getElementById('multiplayerScreen').classList.remove('active');
+                if (typeof Game !== 'undefined' && Game.startMultiplayer) {
+                    Game.startMultiplayer();
+                }
+            }
+            
+            if (this.onUpdate) this.onUpdate(data);
+        });
+    },
+    
     async startGame() {
         if (!this.isHost || !this.roomRef) return;
         
@@ -307,18 +370,29 @@ const Multiplayer = {
         // Generate level seed
         const seed = Math.floor(Math.random() * 999999);
         
-        await this.roomRef.update({
-            status: 'playing',
-            seed: seed,
-            startTime: Date.now(),
-            gameState: {
-                started: true,
+        try {
+            await this.roomRef.update({
+                status: 'playing',
                 seed: seed,
-                timestamp: Date.now()
+                startTime: Date.now(),
+                gameState: {
+                    started: true,
+                    seed: seed,
+                    timestamp: Date.now()
+                }
+            });
+            
+            this.gameStarted = true;
+            
+            // ✅ Langsung mulai game untuk host!
+            if (typeof Game !== 'undefined' && Game.startMultiplayer) {
+                // Sembunyikan multiplayer screen
+                document.getElementById('multiplayerScreen').classList.remove('active');
+                Game.startMultiplayer();
             }
-        });
-        
-        this.gameStarted = true;
+        } catch(e) {
+            console.error('Start game error:', e);
+        }
     },
     
     async updatePlayerState(score, distance, lives, alive) {

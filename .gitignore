@@ -1,22 +1,49 @@
-# File system artifacts
-nul
-NUL
-*.swp
-*.swo
-*~
+# ===== SENSITIVE CONFIG (JANGAN DI-COMMIT!) =====
+# Vercel local config — berisi project ID & org ID
+.vercel/
 
-# Design references (not game assets)
-New folder/
+# Environment variables (kalau nanti pakai)
+.env
+.env.local
+.env.production
 
-# OS files
+# ===== OS FILES =====
 Thumbs.db
 .DS_Store
 Desktop.ini
+ehthumbs.db
+*.lnk
 
-# IDE files
+# ===== IDE & EDITOR =====
 .vscode/
 .idea/
 *.sublime-*
+*.swp
+*.swo
+*~
+*.bak
 
-# Logs
+# ===== LOGS =====
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== BUILD OUTPUT =====
+dist/
+build/
+out/
+.next/
+
+# ===== DEPENDENCIES =====
+node_modules/
+
+# ===== FILE SYSTEM ARTIFACTS =====
+nul
+NUL
+
+# ===== LOCAL DESIGN REFS =====
+New folder/
+*.psd
+*.ai
+*.sketch

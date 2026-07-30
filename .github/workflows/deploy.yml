@@ -1,0 +1,123 @@
+name: 🚀 Deploy Voice Runner to Vercel
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  # Bisa juga trigger manual dari GitHub UI
+  workflow_dispatch:
+
+jobs:
+  # ===== JOB 1: Cek kualitas kode =====
+  lint:
+    name: ✅ Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Check HTML validity
+        run: |
+          # Cek file-file penting ada
+          if [ ! -f "index.html" ]; then
+            echo "❌ index.html not found!"
+            exit 1
+          fi
+          if [ ! -d "js" ]; then
+            echo "❌ js/ directory not found!"
+            exit 1
+          fi
+          if [ ! -d "css" ]; then
+            echo "❌ css/ directory not found!"
+            exit 1
+          fi
+          echo "✅ All required files exist"
+
+      - name: 🧪 Check JavaScript syntax
+        run: |
+          # Cek syntax JS files with node
+          for file in js/*.js; do
+            echo "Checking $file..."
+            node --check "$file" 2>&1 || {
+              echo "❌ Syntax error in $file"
+              exit 1
+            }
+          done
+          echo "✅ All JavaScript files have valid syntax"
+
+      - name: 📦 Check file sizes (ZIP limit ~50MB)
+        run: |
+          total=0
+          echo "=== File sizes ==="
+          du -sh . --exclude=.git
+          echo "=================="
+          largest=$(find . -not -path './.git/*' -type f -exec du -b {} \; | sort -rn | head -5)
+          echo "Largest files:"
+          echo "$largest"
+
+  # ===== JOB 2: Build + Deploy ke Vercel =====
+  deploy:
+    name: 🌐 Deploy to Vercel
+    needs: lint
+    # Hanya deploy dari push ke main/master, bukan dari PR
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: ⚡ Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: 🔌 Pull Vercel Environment Information
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --scope=${{ secrets.VERCEL_ORG_ID || '' }}
+
+      - name: 🏗️ Build Project Artifacts
+        run: |
+          vercel build \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🚀 Deploy to Vercel
+        run: |
+          vercel deploy \
+            --prebuilt \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --scope=${{ secrets.VERCEL_ORG_ID || '' }} \
+            2>&1 | tee deploy-output.txt
+
+      - name: 🌍 Get Deployment URL
+        run: |
+          echo "### ✅ Deployed to Vercel! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment URL:" >> $GITHUB_STEP_SUMMARY
+          grep -o 'https://[^ ]*\.vercel\.app' deploy-output.txt | head -1 | \
+            while read url; do
+              echo "- **Production**: [$url]($url)" >> $GITHUB_STEP_SUMMARY
+              echo "url=$url" >> $GITHUB_OUTPUT
+            done || echo "- Check Vercel dashboard for URL" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 Send Telegram Notification (optional)
+        if: always()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID || '' }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN || '' }}
+          message: |
+            Voice Runner ${{ job.status == 'success' && '✅' || '❌' }} ${{ job.status == 'success' && 'Deployed!' || 'Deploy failed!' }}
+            Commit: ${{ github.event.head_commit.message || 'Manual trigger' }}
+          format: markdown
+          disable_web_page_preview: true
+        continue-on-error: true

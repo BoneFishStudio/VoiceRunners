@@ -3,7 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Voice Runner</title>
+    <title>Voice Runner - Lari. Lompat. Baca. Bertahan.</title>
+    
+    <!-- Open Graph / Social Share -->
+    <meta property="og:title" content="Voice Runner">
+    <meta property="og:description" content="Lari. Lompat. Baca. Bertahan. — Game endless runner dengan voice challenge dan multiplayer 4 pemain!">
+    <meta property="og:image" content="https://YOUR-USERNAME.itch.io/YOUR-GAME/thumbnail.png">
+    <meta property="og:url" content="https://YOUR-USERNAME.itch.io/YOUR-GAME">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Voice Runner">
+    <meta name="twitter:card" content="summary_large_image">
+    
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -42,9 +52,8 @@
                     </div>
                 </div>
             </div>
-            <!-- RIGHT PANEL: Character animation -->
+            <!-- RIGHT PANEL: Game preview + Feature badges -->
             <div class="menu-right">
-                <canvas id="menuCharacterCanvas"></canvas>
                 <div class="menu-right-overlay">
                     <div class="menu-features">
                         <div class="feature-item">
@@ -192,10 +201,17 @@
             </div>
             <div class="hud-center">
                 <div class="hud-distance" id="distanceDisplay">0 m</div>
+                <div class="volume-indicator">
+                    <div class="volume-bar-bg">
+                        <div class="volume-bar-fill" id="volumeBar"></div>
+                    </div>
+                    <span class="volume-label" id="volumeLabel">🔇 ...</span>
+                </div>
             </div>
             <div class="hud-right">
                 <button class="hud-btn" onclick="togglePause()" title="Pause">⏸</button>
                 <button class="hud-btn" onclick="toggleMusic()" title="Musik">🎵</button>
+                <button class="hud-btn" onclick="Game.showInstructions()" title="Cara Bermain">❓</button>
             </div>
         </div>
 
@@ -209,6 +225,9 @@
             <div class="voice-pulse"></div>
             <span id="voiceText">🎤 Dengarkan teksnya...</span>
         </div>
+
+        <!-- Checkpoint notification -->
+        <div id="checkpointNotif" class="overlay-hidden checkpoint-notif">📍 CHECKPOINT 0m</div>
 
         <!-- Pause Menu -->
         <div id="pauseMenu" class="overlay-hidden">
@@ -334,6 +353,54 @@
                 </button>
             </div>
             <p class="ad-note">Kamu bisa mengubah izin ini kapan saja di Settings browser.</p>
+        </div>
+    </div>
+
+    <!-- ========== INSTRUCTIONS OVERLAY ========== -->
+    <div id="instructionsOverlay" class="overlay-hidden instructions-overlay">
+        <div class="instructions-content">
+            <h2>🎮 CARA BERMAIN</h2>
+            <div class="instruction-steps">
+                <div class="instruction-item">
+                    <span class="instr-icon">🗣️</span>
+                    <div>
+                        <strong>1. Buat Suara untuk Lompat!</strong>
+                        <p>Semakin keras suaramu, semakin tinggi lompatan!</p>
+                    </div>
+                </div>
+                <div class="instruction-volumes">
+                    <div class="vol-item low">
+                        <span class="vol-icon">🔇</span>
+                        <span class="vol-desc">Pelan → Lompat rendah</span>
+                        <span class="vol-type">🔼 Spike</span>
+                    </div>
+                    <div class="vol-item mid">
+                        <span class="vol-icon">🗣️</span>
+                        <span class="vol-desc">Normal → Lompat sedang</span>
+                        <span class="vol-type">📦 Box</span>
+                    </div>
+                    <div class="vol-item high">
+                        <span class="vol-icon">📢</span>
+                        <span class="vol-desc">KERAS → Lompat tinggi</span>
+                        <span class="vol-type">🏛️ Tiang</span>
+                    </div>
+                </div>
+                <div class="instruction-item">
+                    <span class="instr-icon">🕳️</span>
+                    <div>
+                        <strong>2. Bacakan Teks!</strong>
+                        <p>Di lubang ada teks — bacakan dengan suara keras untuk mengisinya!</p>
+                    </div>
+                </div>
+                <div class="instruction-item">
+                    <span class="instr-icon">📍</span>
+                    <div>
+                        <strong>3. Checkpoint Otomatis</strong>
+                        <p>Setiap 500 meter progress tersimpan. Kalau mati, respawn di sini!</p>
+                    </div>
+                </div>
+            </div>
+            <button class="menu-btn primary" onclick="Game.hideInstructions()">🎮 MULAI MAIN!</button>
         </div>
     </div>
 
