@@ -76,7 +76,7 @@
       ]
     }
   ],
-  "rewrites": []
+  "rewrites": [],
   "github": {
     "silent": true,
     "autoAlias": true
