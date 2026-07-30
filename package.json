@@ -1,0 +1,70 @@
+{
+  "name": "voice-runner",
+  "version": "1.0.0",
+  "description": "🎤 Voice Runner — Endless runner game dengan voice control",
+  "main": "electron/main.js",
+  "author": "BoneFishStudio",
+  "license": "MIT",
+  "scripts": {
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder",
+    "electron:build:win": "electron-builder --win",
+    "electron:build:mac": "electron-builder --mac",
+    "electron:build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.bonefishstudio.voicerunner",
+    "productName": "Voice Runner",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "index.html",
+      "js/**/*",
+      "css/**/*",
+      "Music/**/*",
+      "assets/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "VoiceRunner-Setup-${version}-win.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "VoiceRunner-${version}-mac.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "VoiceRunner-${version}-linux.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Voice Runner"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
