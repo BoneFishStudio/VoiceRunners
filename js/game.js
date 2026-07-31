@@ -45,7 +45,7 @@ const IS_MOBILE = (typeof navigator !== 'undefined') &&
 // HP flagship (mobile tapi RAM/CPU cukup): moderat — glow tetap ada, cuma dikurangi
 const GLOW_SCALE = LOW_POWER ? 0.35 : (IS_MOBILE ? 0.7 : 1);
 // Batas pixel ratio (DPR 3-4 di HP = buffer canvas raksasa = GPU overload)
-const MAX_DPR = LOW_POWER ? 1.5 : (IS_MOBILE ? 2 : 2);
+const MAX_DPR = LOW_POWER ? 1.5 : 2;
 
 // Palette tiap tema — semua warna procedural/vector, tanpa image assets
 const THEMES = {
