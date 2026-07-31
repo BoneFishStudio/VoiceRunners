@@ -194,37 +194,19 @@ jobs:
           echo "✅ Tag created: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: 📦 Publish / Update GitHub Release
+      - name: 📦 Upload artifacts ke Release yang sudah ada
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
-          name: "Voice Runner ${{ needs.prepare.outputs.version }}"
+          # JANGAN set body — biar body dari deploy.yml tidak tertimpa.
+          # Kita cuma upload files ke release yang sama.
           files: |
             artifacts/VoiceRunner-windows/*.exe
             artifacts/VoiceRunner-macos/*.dmg
             artifacts/VoiceRunner-linux/*.AppImage
-          body: |
-            ## 🖥️ Desktop Build ${{ needs.prepare.outputs.version }}
-            
-            **Commit:** ${{ github.event.head_commit.message || 'Manual trigger' }}
-            
-            ### 📥 Downloads
-            
-            | Platform | File | Status |
-            |----------|------|--------|
-            | 🪟 Windows | `VoiceRunner-*-win.exe` (portable) | ${{ needs.build-windows.result == 'success' && '✅' || '❌' }} |
-            | 🍎 macOS | `VoiceRunner-*-mac.dmg` | ${{ needs.build-macos.result == 'success' && '✅' || '❌' }} |
-            | 🐧 Linux | `VoiceRunner-*-linux.AppImage` | ${{ needs.build-linux.result == 'success' && '✅' || '❌' }} |
-            
-            > 💡 **Windows**: File `.exe` portable — langsung jalan, tidak perlu install.
-            > 💡 **macOS**: Setelah download, buka Terminal dan jalankan:
-            > `xattr -d com.apple.quarantine /path/to/VoiceRunner-*.dmg`
-            > 💡 **Linux**: Jadikan file executable: `chmod +x VoiceRunner-*.AppImage`
-            
-            ---
-            *Build #${{ github.run_number }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          # Explicit: update existing release, bukan bikin baru
+          update_existing: true
+          # Jangan generate release notes (nanti timpa yang dari deploy)
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
