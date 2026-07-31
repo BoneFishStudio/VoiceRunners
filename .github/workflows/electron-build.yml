@@ -15,6 +15,7 @@ on:
     paths:
       - 'electron/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'index.html'
       - 'js/**'
       - 'css/**'
