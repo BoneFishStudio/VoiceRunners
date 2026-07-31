@@ -57,6 +57,7 @@
         }
       ],
       "icon": "assets/icon.png",
+      "category": "Game",
       "artifactName": "VoiceRunner-${version}-linux.${ext}"
     },
     "nsis": {

@@ -30,7 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      tag_exists: ${{ steps.tag_check.outputs.exists }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -54,18 +53,6 @@ jobs:
           VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Version: $VERSION"
-
-      - name: 🔍 Cek apakah tag release sudah ada
-        id: tag_check
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Tag $VERSION sudah ada — akan upload ke release yang ada"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "📦 Tag $VERSION belum ada — perlu buat release baru"
-          fi
 
   # ===== JOB 2: Build Electron di Windows =====
   build-windows:
@@ -118,16 +105,7 @@ jobs:
         run: npm ci
 
       - name: 🏗️ Build macOS (.dmg)
-        run: |
-          set +e
-          npm run electron:build:mac > build-mac.log 2>&1
-          code=$?
-          if [ $code -ne 0 ]; then
-            echo "::error::🚨 Build macOS FAILED (exit $code) — 9 baris error terakhir (max 10 annotation/step):"
-            { grep -iE '⨯|error|failed|cannot|fatal' build-mac.log || true; } | tail -9 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done
-            exit $code
-          fi
-          cat build-mac.log
+        run: npm run electron:build:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           # electron-builder butuh GH_TOKEN utk download Electron (x64+arm64)
@@ -164,16 +142,7 @@ jobs:
           sudo apt-get install -y libfuse2
 
       - name: 🏗️ Build Linux (AppImage)
-        run: |
-          set +e
-          npm run electron:build:linux > build-linux.log 2>&1
-          code=$?
-          if [ $code -ne 0 ]; then
-            echo "::error::🚨 Build Linux FAILED (exit $code) — 9 baris error terakhir (max 10 annotation/step):"
-            { grep -iE '⨯|error|failed|cannot|fatal' build-linux.log || true; } | tail -9 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done
-            exit $code
-          fi
-          cat build-linux.log
+        run: npm run electron:build:linux
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           # electron-builder butuh GH_TOKEN utk download Electron + AppImage tooling
@@ -217,19 +186,12 @@ jobs:
           find artifacts -type f -ls 2>/dev/null || echo "(no artifacts found)"
           echo "==========================="
 
-      - name: 🏷️ Buat tag & release (kalau belum ada)
-        id: create_release
-        if: needs.prepare.outputs.tag_exists == 'false'
-        run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          git tag "$VERSION"
-          git push origin "$VERSION"
-          echo "✅ Tag created: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: 📦 Upload artifacts ke Release yang sudah ada
+      - name: 📦 Upload artifacts ke GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # softprops bikin tag+release otomatis kalau belum ada, dan meng-update
+          # kalau sudah ada — jadi race dengan deploy.yml (yang juga bikin tag
+          # versi yang sama) tidak akan error lagi.
           tag_name: ${{ needs.prepare.outputs.version }}
           # JANGAN set body — biar body dari deploy.yml tidak tertimpa.
           # Kita cuma upload files ke release yang sama.
