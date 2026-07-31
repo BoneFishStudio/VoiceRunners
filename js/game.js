@@ -14,6 +14,93 @@ const OBSTACLE_MIN_GAP = 120;
 const OBSTACLE_MAX_GAP = 200;
 const PIT_CHANCE = 0.15;
 
+// ===== SISTEM 5 TEMA BACKGROUND =====
+// Urutan siklus tema berdasarkan jarak (distance):
+// City → Forest → Night → Morning → Sore → ulang
+const THEME_CYCLE = ['city', 'forest', 'night', 'morning', 'sore'];
+const THEME_LENGTH = 800;       // Meter per tema penuh
+const THEME_BLEND_ZONE = 180;   // Zona transisi crossfade di ujung tiap tema (m)
+const THEME_PREVIEW_SPEED = 1;  // DEV: set > 1 (misal 10) untuk preview transisi cepat
+
+// Palette tiap tema — semua warna procedural/vector, tanpa image assets
+const THEMES = {
+    city: {
+        name: 'City (Siang)',
+        isDark: false,
+        sky: ['#5ec8ff', '#b8e6ff', '#f4fbff'],
+        stars: 0,
+        clouds: true,
+        sun: { alpha: 0.85, size: 42, y: 0.16, clip: false },
+        moon: { alpha: 0 },
+        mountains: 0,
+        mountainsColor: '#cfe8f8',
+        buildings: 0.2,
+        buildingColor: '#3d6ea6',
+        trees: 0,
+        glow: { color: '130, 200, 255', strength: 0.05 }
+    },
+    forest: {
+        name: 'Forest (Hutan)',
+        isDark: false,
+        sky: ['#8fdcae', '#c2efcf', '#eefaf0'],
+        stars: 0,
+        clouds: true,
+        sun: { alpha: 0.55, size: 46, y: 0.2, clip: false },
+        moon: { alpha: 0 },
+        mountains: 0.06,
+        mountainsColor: '#4d8f6a',
+        buildings: 0,
+        buildingColor: '#2e6b4a',
+        trees: 0.25,
+        glow: { color: '100, 210, 140', strength: 0.05 }
+    },
+    night: {
+        name: 'Night (Malam)',
+        isDark: true,
+        sky: ['#0f0f1a', '#1a1a2e', '#0a0a0a'],
+        stars: 1,
+        clouds: false,
+        sun: { alpha: 0 },
+        moon: { alpha: 0.9, size: 34, y: 0.16 },
+        mountains: 0.08,
+        mountainsColor: '#ffffff',
+        buildings: 0.06,
+        buildingColor: '#ffffff',
+        trees: 0,
+        glow: { color: '100, 200, 255', strength: 0.08 }
+    },
+    morning: {
+        name: 'Morning (Pagi)',
+        isDark: false,
+        sky: ['#ffd9a8', '#ffeecb', '#a9d8ff'],
+        stars: 0.1,
+        clouds: true,
+        sun: { alpha: 0.95, size: 70, y: 0.34, clip: true },
+        moon: { alpha: 0 },
+        mountains: 0.06,
+        mountainsColor: '#c9a0b0',
+        buildings: 0.05,
+        buildingColor: '#8a6a7a',
+        trees: 0,
+        glow: { color: '255, 190, 120', strength: 0.08 }
+    },
+    sore: {
+        name: 'Sore (Sunset)',
+        isDark: false,
+        sky: ['#ff9a4d', '#e77ba8', '#6a4a9f'],
+        stars: 0.2,
+        clouds: false,
+        sun: { alpha: 0.9, size: 58, y: 0.46, clip: true },
+        moon: { alpha: 0 },
+        mountains: 0.08,
+        mountainsColor: '#3a2a5a',
+        buildings: 0.14,
+        buildingColor: '#2a1a3a',
+        trees: 0,
+        glow: { color: '255, 130, 90', strength: 0.08 }
+    }
+};
+
 /**
  * mulberry32 — Seeded PRNG sederhana.
  * Deterministic: seed yang sama selalu menghasilkan urutan angka yang sama.
@@ -87,6 +174,14 @@ const Game = {
     // Seed & RNG (untuk deterministic multiplayer sync)
     seed: 0,
     _rng: null,
+    
+    // Tema background (real-time transition per jarak)
+    currentTheme: 'city',
+    nextTheme: 'city',
+    blendProgress: 0,
+    themePreviewSpeed: undefined, // DEV: set 10 di console utk preview transisi cepat
+    themeDistance: 0,             // Jarak khusus tema — tidak di-rewind saat respawn,
+                                  // supaya tema tidak "lompat" balik ke awal saat checkpoint.
     
     // Ramp kesulitan
     rampMultiplier: 1, // 1x = normal, ~1.16x at 1000m, ~1.32x at 2000m, etc
@@ -336,6 +431,7 @@ const Game = {
         // Update background
         this.updateMountains();
         this.distance += this.gameSpeed * 0.05;
+        this.themeDistance += this.gameSpeed * 0.05;
         
         // Auto-jump logic
         const p = this.player;
@@ -468,6 +564,7 @@ const Game = {
         
         this.score = 0;
         this.distance = 0;
+        this.themeDistance = 0;
         this.lives = 3;
         this.speed = BASE_SPEED;
         this.gameSpeed = BASE_SPEED;
@@ -589,8 +686,9 @@ const Game = {
         
         if (this.gameSpeed > MAX_SPEED) this.gameSpeed = MAX_SPEED;
         
-        // Update distance
+        // Update distance (tema juga jalan — tapi themeDistance tidak di-rewind saat respawn)
         this.distance += this.gameSpeed * 0.1;
+        this.themeDistance += this.gameSpeed * 0.1;
         
         // Ground scroll
         this.groundX -= this.gameSpeed;
@@ -1753,19 +1851,108 @@ const Game = {
     },
     
     drawBackground(ctx, w, h) {
-        // Dark gradient sky
+        // ===== SISTEM 5 TEMA — TRANSISI REAL-TIME =====
+        // Tema berubah mulus mengikuti jarak (distance), bukan lompatan mendadak:
+        // City → Forest → Night → Morning → Sore → ulang, tiap 800m,
+        // dengan zona transisi 180m yang meng-crossfade ke tema berikutnya.
+        // DEV: set THEME_PREVIEW_SPEED = 10 di console utk preview transisi cepat.
+        const blend = this.getThemeBlend(this.distance);
+        this.currentTheme = blend.currentTheme;
+        this.nextTheme = blend.nextTheme;
+        this.blendProgress = blend.blendProgress;
+        const t = blend.blendProgress;
+        
+        // 1) Langit: interpolasi per-channel RGB antar 2 tema (bukan numpuk layer transparan)
+        this.drawSkyGradient(ctx, w, h, THEMES[blend.currentTheme], THEMES[blend.nextTheme], t);
+        
+        // 2) Elemen tema sekarang (alpha 1-t)
+        this.drawThemeScene(ctx, w, h, blend.currentTheme, 1 - t, true);
+        
+        // 3) Elemen tema berikutnya ditumpuk di atasnya (alpha t) → crossfade halus
+        if (t > 0.01) {
+            this.drawThemeScene(ctx, w, h, blend.nextTheme, t, true);
+        }
+    },
+    
+    // ===== THEME HELPERS =====
+    
+    getThemeBlend(distance) {
+        const totalCycle = THEME_LENGTH * THEME_CYCLE.length;
+        // Preview: ubah di console `Game.themePreviewSpeed = 10` utk transisi cepat
+        const speed = (this.themePreviewSpeed !== undefined) ? this.themePreviewSpeed : THEME_PREVIEW_SPEED;
+        const d = (distance !== undefined) ? distance : this.themeDistance;
+        const pos = (d * speed) % totalCycle;
+        const themeIndex = Math.floor(pos / THEME_LENGTH);
+        const inTheme = pos - themeIndex * THEME_LENGTH;
+        const currentTheme = THEME_CYCLE[themeIndex];
+        const nextTheme = THEME_CYCLE[(themeIndex + 1) % THEME_CYCLE.length];
+        
+        // Zona transisi: 180m terakhir tiap tema → crossfade bertahap
+        let blendProgress = 0;
+        if (inTheme > THEME_LENGTH - THEME_BLEND_ZONE) {
+            blendProgress = (inTheme - (THEME_LENGTH - THEME_BLEND_ZONE)) / THEME_BLEND_ZONE;
+        }
+        return { currentTheme, nextTheme, blendProgress };
+    },
+    
+    hexToRgb(hex) {
+        const m = hex.replace('#', '');
+        return [
+            parseInt(m.substr(0, 2), 16),
+            parseInt(m.substr(2, 2), 16),
+            parseInt(m.substr(4, 2), 16)
+        ];
+    },
+    
+    lerpRgb(c1, c2, t) {
+        const r1 = this.hexToRgb(c1);
+        const r2 = this.hexToRgb(c2);
+        const r = Math.round(r1[0] + (r2[0] - r1[0]) * t);
+        const g = Math.round(r1[1] + (r2[1] - r1[1]) * t);
+        const b = Math.round(r1[2] + (r2[2] - r1[2]) * t);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    },
+    
+    drawSkyGradient(ctx, w, h, th1, th2, t) {
+        // Interpolasi per-channel: langit berubah warna pelan-pelan,
+        // bukan cross-fade 2 layer terpisah (deterministic per jarak).
         const grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#0f0f1a');
-        grad.addColorStop(0.5, '#1a1a2e');
-        grad.addColorStop(1, '#0a0a0a');
+        for (let i = 0; i < 3; i++) {
+            grad.addColorStop(i / 2, this.lerpRgb(th1.sky[i], th2.sky[i], t));
+        }
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, w, h);
-        
-        // Stars
+    },
+    
+    drawThemeScene(ctx, w, h, themeName, alpha, skipSky) {
         ctx.save();
+        ctx.globalAlpha = alpha;
+        switch (themeName) {
+            case 'city':    this.drawCityTheme(ctx, w, h, skipSky); break;
+            case 'forest':  this.drawForestTheme(ctx, w, h, skipSky); break;
+            case 'night':   this.drawNightTheme(ctx, w, h, skipSky); break;
+            case 'morning': this.drawMorningTheme(ctx, w, h, skipSky); break;
+            case 'sore':    this.drawSoreTheme(ctx, w, h, skipSky); break;
+            default:        this.drawNightTheme(ctx, w, h, skipSky);
+        }
+        ctx.restore();
+    },
+    
+    drawThemeSky(ctx, w, h, th) {
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        for (let i = 0; i < 3; i++) {
+            grad.addColorStop(i / 2, th.sky[i]);
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+    },
+    
+    drawThemeStars(ctx, w, th) {
+        if (th.stars <= 0) return;
+        const base = ctx.globalAlpha;
         for (const star of this.bgStars) {
             const twinkle = 0.7 + Math.sin(this.frameCount * star.twinkleSpeed) * 0.3;
-            ctx.globalAlpha = star.brightness * twinkle;
+            ctx.globalAlpha = base * th.stars * star.brightness * twinkle;
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(
@@ -1777,12 +1964,89 @@ const Game = {
             );
             ctx.fill();
         }
-        ctx.restore();
-        
-        // Mountains (far background)
+        ctx.globalAlpha = base;
+    },
+    
+    drawThemeClouds(ctx, w, th) {
+        if (!th.clouds) return;
+        const base = ctx.globalAlpha;
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        for (let i = 0; i < 5; i++) {
+            const cx = ((i * 280 + 60 - this.distance * 0.03) % (w + 300) + w + 300) % (w + 300) - 150;
+            const cy = 50 + (i % 3) * 45 + Math.sin(i * 2.4) * 12;
+            ctx.globalAlpha = base * 0.45;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 60, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + 32, cy - 9, 42, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = base;
+    },
+    
+    drawThemeSun(ctx, w, h, th) {
+        if (!th.sun || th.sun.alpha <= 0) return;
+        const base = ctx.globalAlpha;
+        const s = th.sun;
+        const sx = w * 0.72;
+        // Matahari terbit/terbenam: pusat digeser ke garis horizon biar benar-benar
+        // "setengah muncul"/"tenggelam" (bukan melayang di tengah langit).
+        let sy = h * s.y;
+        if (s.clip) {
+            sy = this.player.groundY - s.size * 0.35;
+        }
         ctx.save();
-        ctx.globalAlpha = 0.08;
-        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = base * s.alpha;
+        if (s.clip) {
+            // Potong di garis horizon → tampak setengah terbenam
+            ctx.beginPath();
+            ctx.rect(0, 0, w, this.player.groundY);
+            ctx.clip();
+        }
+        // Halo lembut
+        const halo = ctx.createRadialGradient(sx, sy, 4, sx, sy, s.size * 2.4);
+        halo.addColorStop(0, 'rgba(255,245,210,0.5)');
+        halo.addColorStop(1, 'rgba(255,245,210,0)');
+        ctx.fillStyle = halo;
+        ctx.fillRect(sx - s.size * 2.4, sy - s.size * 2.4, s.size * 4.8, s.size * 4.8);
+        // Badan matahari
+        ctx.fillStyle = '#fff6d8';
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    },
+    
+    drawThemeMoon(ctx, w, h, th) {
+        if (!th.moon || th.moon.alpha <= 0) return;
+        const base = ctx.globalAlpha;
+        const m = th.moon;
+        const mx = w * 0.78;
+        const my = h * m.y;
+        ctx.save();
+        ctx.globalAlpha = base * m.alpha;
+        ctx.fillStyle = '#f5f7ff';
+        ctx.shadowColor = 'rgba(230,235,255,0.5)';
+        ctx.shadowBlur = 22;
+        ctx.beginPath();
+        ctx.arc(mx, my, m.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Kawah sederhana
+        ctx.fillStyle = 'rgba(200,210,235,0.4)';
+        ctx.beginPath(); ctx.arc(mx - 9, my - 5, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(mx + 8, my + 7, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(mx + 2, my + 11, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    },
+    
+    drawThemeMountains(ctx, w, th) {
+        if (th.mountains <= 0) return;
+        const base = ctx.globalAlpha;
+        ctx.save();
+        ctx.globalAlpha = base * th.mountains;
+        ctx.fillStyle = th.mountainsColor;
         for (const mtn of this.bgMountains) {
             const mx = ((mtn.x - this.distance * 0.05) % (w + 300) + w + 300) % (w + 300) - 150;
             ctx.beginPath();
@@ -1793,33 +2057,157 @@ const Game = {
             ctx.fill();
         }
         ctx.restore();
-        
-        // City silhouette (mid background)
+    },
+    
+    drawThemeBuildings(ctx, w, th) {
+        if (th.buildings <= 0) return;
+        const base = ctx.globalAlpha;
         ctx.save();
-        ctx.globalAlpha = 0.05;
-        ctx.fillStyle = '#fff';
-        const buildings = 10;
+        ctx.globalAlpha = base * th.buildings;
+        ctx.fillStyle = th.buildingColor;
+        const buildings = 14;
         for (let i = 0; i < buildings; i++) {
             const bx = ((i * (w / buildings) + 50 - this.distance * 0.1) % (w + 200) + w + 200) % (w + 200) - 100;
-            const bh = 40 + Math.sin(i * 2.5) * 30 + 30;
-            const bw = 30 + Math.sin(i * 1.7) * 15;
+            const bh = 50 + Math.sin(i * 2.5) * 30 + (i % 4) * 12;
+            const bw = 30 + Math.sin(i * 1.7) * 14;
             ctx.fillRect(bx, this.player.groundY - bh, bw, bh);
+            // Jendela sederhana
+            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            for (let wy = 8; wy < bh - 10; wy += 14) {
+                ctx.fillRect(bx + 4, this.player.groundY - bh + wy, 5, 6);
+            }
+            ctx.fillStyle = th.buildingColor;
         }
         ctx.restore();
-        
-        // === AMBIENT GLOW (pulsing neon dari bawah) ===
+    },
+    
+    drawThemeTrees(ctx, w, th) {
+        if (th.trees <= 0) return;
+        const base = ctx.globalAlpha;
         ctx.save();
+        ctx.globalAlpha = base * th.trees;
+        const trees = 12;
+        for (let i = 0; i < trees; i++) {
+            const tx = ((i * (w / trees) + 40 - this.distance * 0.1) % (w + 200) + w + 200) % (w + 200) - 100;
+            const tht = 70 + Math.sin(i * 2.1) * 20 + (i % 3) * 10;
+            const tw = 26 + Math.sin(i * 1.3) * 8;
+            // Batang
+            ctx.fillStyle = '#5a3d22';
+            ctx.fillRect(tx - 3, this.player.groundY - tht * 0.35, 6, tht * 0.35);
+            // Daun (segitiga bertumpuk)
+            ctx.fillStyle = th.buildingColor;
+            ctx.beginPath();
+            ctx.moveTo(tx - tw, this.player.groundY - tht * 0.45);
+            ctx.lineTo(tx, this.player.groundY - tht);
+            ctx.lineTo(tx + tw, this.player.groundY - tht * 0.45);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(tx - tw * 0.7, this.player.groundY - tht * 0.2);
+            ctx.lineTo(tx, this.player.groundY - tht * 0.55);
+            ctx.lineTo(tx + tw * 0.7, this.player.groundY - tht * 0.2);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+    },
+    
+    drawThemeGlow(ctx, w, h, th) {
+        const base = ctx.globalAlpha;
         const glowPulse = 0.3 + Math.sin(this.frameCount * 0.02) * 0.15;
         const ambientGrad = ctx.createRadialGradient(
             w * 0.5, this.player.groundY + 50, 10,
             w * 0.5, this.player.groundY + 50, h * 0.6
         );
-        ambientGrad.addColorStop(0, `rgba(100, 200, 255, ${glowPulse * 0.08})`);
-        ambientGrad.addColorStop(0.5, `rgba(80, 150, 255, ${glowPulse * 0.04})`);
+        ambientGrad.addColorStop(0, `rgba(${th.glow.color}, ${glowPulse * th.glow.strength * base})`);
+        ambientGrad.addColorStop(0.5, `rgba(${th.glow.color}, ${glowPulse * th.glow.strength * 0.5 * base})`);
         ambientGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = ambientGrad;
         ctx.fillRect(0, 0, w, h);
-        ctx.restore();
+    },
+    
+    // ===== 5 FUNGSI TEMA =====
+    // Masing-masing pakai teknik yang sama (canvas primitives + parallax distance),
+    // cuma komposisi elemen & palet warnanya yang berbeda.
+    
+    drawCityTheme(ctx, w, h, skipSky) {
+        const th = THEMES.city;
+        if (!skipSky) this.drawThemeSky(ctx, w, h, th);
+        this.drawThemeClouds(ctx, w, th);
+        this.drawThemeSun(ctx, w, h, th);
+        this.drawThemeBuildings(ctx, w, th);
+        this.drawThemeGlow(ctx, w, h, th);
+    },
+    
+    drawForestTheme(ctx, w, h, skipSky) {
+        const th = THEMES.forest;
+        if (!skipSky) this.drawThemeSky(ctx, w, h, th);
+        this.drawThemeClouds(ctx, w, th);
+        this.drawThemeSun(ctx, w, h, th);
+        this.drawThemeMountains(ctx, w, th);
+        this.drawThemeTrees(ctx, w, th);
+        this.drawThemeGlow(ctx, w, h, th);
+    },
+    
+    drawNightTheme(ctx, w, h, skipSky) {
+        const th = THEMES.night;
+        if (!skipSky) this.drawThemeSky(ctx, w, h, th);
+        this.drawThemeStars(ctx, w, th);
+        this.drawThemeMoon(ctx, w, h, th);
+        this.drawThemeMountains(ctx, w, th);
+        this.drawThemeBuildings(ctx, w, th);
+        this.drawThemeGlow(ctx, w, h, th);
+    },
+    
+    drawMorningTheme(ctx, w, h, skipSky) {
+        const th = THEMES.morning;
+        if (!skipSky) this.drawThemeSky(ctx, w, h, th);
+        this.drawThemeStars(ctx, w, th);
+        this.drawThemeClouds(ctx, w, th);
+        this.drawThemeSun(ctx, w, h, th);
+        this.drawThemeMountains(ctx, w, th);
+        this.drawThemeBuildings(ctx, w, th);
+        this.drawThemeGlow(ctx, w, h, th);
+    },
+    
+    drawSoreTheme(ctx, w, h, skipSky) {
+        const th = THEMES.sore;
+        if (!skipSky) this.drawThemeSky(ctx, w, h, th);
+        this.drawThemeStars(ctx, w, th);
+        this.drawThemeSun(ctx, w, h, th);
+        this.drawThemeMountains(ctx, w, th);
+        this.drawThemeBuildings(ctx, w, th);
+        this.drawThemeGlow(ctx, w, h, th);
+    },
+    
+    // ===== ADAPTASI WARNA KARAKTER & RINTANGAN PER TEMA =====
+    
+    // Seberapa gelap tema aktif (0 = terang, 1 = gelap) — dipakai utk kontras outline
+    getThemeDarkness() {
+        // Pakai state yang sudah di-set drawBackground (single source of truth)
+        const cur = THEMES[this.currentTheme] || THEMES.night;
+        const nxt = THEMES[this.nextTheme] || THEMES.night;
+        const d1 = cur.isDark ? 1 : 0;
+        const d2 = nxt.isDark ? 1 : 0;
+        return d1 + (d2 - d1) * (this.blendProgress || 0);
+    },
+    
+    // Outline karakter: tema terang (d≈0) → outline gelap, tema gelap (d≈1) → outline terang
+    getPlayerOutlineColor() {
+        const d = this.getThemeDarkness();
+        const r = Math.round(10 + 235 * d);
+        const g = Math.round(20 + 230 * d);
+        const b = Math.round(40 + 215 * d);
+        return 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
+    },
+    
+    // Outline rintangan: tema terang → outline gelap, tema gelap → outline terang
+    getObstacleOutlineColor() {
+        const d = this.getThemeDarkness();
+        const r = Math.round(10 + 240 * d);
+        const g = Math.round(20 + 230 * d);
+        const b = Math.round(40 + 215 * d);
+        return 'rgba(' + r + ',' + g + ',' + b + ',0.5)';
     },
     
     drawGround(ctx, w, h) {
@@ -1894,6 +2282,44 @@ const Game = {
         }
     },
     
+    // Siluet karakter (untuk outline kontras per tema)
+    drawRunnerSilhouette(ctx, bounce, legSwing, armSwing) {
+        // Badan
+        ctx.fillRect(-6, -36 + bounce, 12, 20);
+        // Kepala
+        ctx.beginPath();
+        ctx.arc(0, -42 + bounce, 9, 0, Math.PI * 2);
+        ctx.fill();
+        // Lengan kiri
+        ctx.save();
+        ctx.translate(-4, -32 + bounce);
+        ctx.rotate(armSwing * 0.03);
+        ctx.fillRect(-10, 0, 4, 13);
+        ctx.fillRect(-10, 11, 4, 3);
+        ctx.restore();
+        // Lengan kanan
+        ctx.save();
+        ctx.translate(4, -32 + bounce);
+        ctx.rotate(-armSwing * 0.03);
+        ctx.fillRect(6, 0, 4, 13);
+        ctx.fillRect(6, 11, 4, 3);
+        ctx.restore();
+        // Kaki kiri
+        ctx.save();
+        ctx.translate(-4, -17 + bounce);
+        ctx.rotate(legSwing * 0.04);
+        ctx.fillRect(-5, 0, 5, 15);
+        ctx.fillRect(-6, 13, 7, 4);
+        ctx.restore();
+        // Kaki kanan
+        ctx.save();
+        ctx.translate(4, -17 + bounce);
+        ctx.rotate(-legSwing * 0.04);
+        ctx.fillRect(0, 0, 5, 15);
+        ctx.fillRect(-1, 13, 7, 4);
+        ctx.restore();
+    },
+    
     drawPlayer(ctx) {
         const p = this.player;
         const px = p.x;
@@ -1931,6 +2357,15 @@ const Game = {
         const bounce = p.isJumping ? 0 : Math.abs(Math.sin(runCycle)) * 3;
         const legSwing = Math.sin(runCycle) * 8;
         const armSwing = Math.sin(runCycle + Math.PI) * 8;
+        
+        // === OUTLINE KONTRAST PER TEMA ===
+        // Siluet sedikit lebih besar di belakang karakter — warna outline menyesuaikan
+        // tema aktif: gelap di tema terang (City/Morning), terang di tema gelap (Night).
+        ctx.save();
+        ctx.fillStyle = this.getPlayerOutlineColor();
+        ctx.scale(1.07, 1.07);
+        this.drawRunnerSilhouette(ctx, bounce, legSwing, armSwing);
+        ctx.restore();
         
         // === RUNNING TRAIL ===
         if (!p.isJumping) {
@@ -2065,6 +2500,8 @@ const Game = {
     
     drawObstacles(ctx) {
         const pulse = Math.sin(this.frameCount * 0.05) * 0.15 + 0.85; // Pulse animasi
+        // Hitung sekali di luar loop (bukan per-objek)
+        const obsOutline = this.getObstacleOutlineColor();
         
         for (const obs of this.obstacles) {
             ctx.save();
@@ -2155,8 +2592,29 @@ const Game = {
                     break;
             }
             
-            // === PULSE RING (efek denyut) ===
+            // === OUTLINE KONTRAST PER TEMA ===
+            // Biar rintangan tetap kebaca jelas di kelima tema (gelap/terang)
             ctx.shadowBlur = 0;
+            ctx.strokeStyle = obsOutline;
+            ctx.lineWidth = 2;
+            switch(obs.type) {
+                case 0: // Box
+                    ctx.strokeRect(ox, oy, ow, oh);
+                    break;
+                case 1: // Spike — stroke segitiga
+                    ctx.beginPath();
+                    ctx.moveTo(ox, oy + oh);
+                    ctx.lineTo(ox + ow / 2, oy);
+                    ctx.lineTo(ox + ow, oy + oh);
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                case 2: // Pillar
+                    ctx.strokeRect(ox + 2, oy, ow - 4, oh);
+                    break;
+            }
+            
+            // === PULSE RING (efek denyut) ===
             ctx.strokeStyle = `rgba(255, 255, 255, ${0.05 * pulse})`;
             ctx.lineWidth = 1;
             ctx.setLineDash([3, 5]);
@@ -2236,15 +2694,16 @@ const Game = {
             const metrics = ctx.measureText(ft.text);
             const tw = metrics.width + 50;
             
-            // Pulse glow on background
+            // Pulse glow on background — backdrop gelap agar teks terbaca di tema terang
             ctx.shadowBlur = 0;
-            ctx.fillStyle = `rgba(255,255,255,${0.08 + Math.sin(ft.wavePhase) * 0.05})`;
+            const darkness = this.getThemeDarkness();
+            ctx.fillStyle = `rgba(12, 20, 40, ${0.55 - darkness * 0.35})`;
             ctx.beginPath();
             ctx.roundRect(-tw / 2, -24, tw, 48, 24);
             ctx.fill();
             
             // Border dengan pulse
-            ctx.strokeStyle = `rgba(255,255,255,${0.2 + Math.sin(ft.wavePhase) * 0.15})`;
+            ctx.strokeStyle = `rgba(255,255,255,${0.35 + Math.sin(ft.wavePhase) * 0.15})`;
             ctx.lineWidth = 2;
             ctx.stroke();
             
