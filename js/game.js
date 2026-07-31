@@ -22,6 +22,31 @@ const THEME_LENGTH = 800;       // Meter per tema penuh
 const THEME_BLEND_ZONE = 180;   // Zona transisi crossfade di ujung tiap tema (m)
 const THEME_PREVIEW_SPEED = 1;  // DEV: set > 1 (misal 10) untuk preview transisi cepat
 
+// ===== DETEKSI DEVICE LOW-POWER (HP / hardware terbatas) =====
+// Dipakai utk auto-turunkan kualitas rendering biar game ringan di semua device:
+// - DPR dibatasi (buffer canvas lebih kecil)
+// - shadowBlur dikurangi (operasi paling mahal di canvas mobile)
+// - Ambient glow full-screen di-skip (hanya di device benar-benar lemah)
+//
+// Dua tingkat:
+// - MODERATE (semua mobile): DPR cap 2 + shadowBlur 70% — visual tetap bagus
+// - LOW_POWER (mobile + RAM/CPU terbatas): DPR 1.5, shadowBlur 35%, glow di-skip
+function detectLowPower() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+    const cores = navigator.hardwareConcurrency || 4;
+    const mem = navigator.deviceMemory || 4;
+    return (mobile && (cores <= 4 || mem <= 4)) || (!mobile && (cores <= 2 || mem <= 2));
+}
+const LOW_POWER = detectLowPower();
+const IS_MOBILE = (typeof navigator !== 'undefined') &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+// HP flagship (mobile tapi RAM/CPU cukup): moderat — glow tetap ada, cuma dikurangi
+const GLOW_SCALE = LOW_POWER ? 0.35 : (IS_MOBILE ? 0.7 : 1);
+// Batas pixel ratio (DPR 3-4 di HP = buffer canvas raksasa = GPU overload)
+const MAX_DPR = LOW_POWER ? 1.5 : (IS_MOBILE ? 2 : 2);
+
 // Palette tiap tema — semua warna procedural/vector, tanpa image assets
 const THEMES = {
     city: {
@@ -277,8 +302,9 @@ const Game = {
     },
     
     resize() {
-        // Gunakan device pixel ratio untuk canvas sharp di layar HD/Retina
-        const dpr = window.devicePixelRatio || 1;
+        // Gunakan device pixel ratio utk canvas sharp — TAPI dibatasi biar gak bikin
+        // buffer raksasa di HP (DPR 3-4 → 9-16x pixel = GPU overload)
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
         const w = window.innerWidth;
         const h = window.innerHeight;
         
@@ -736,8 +762,8 @@ const Game = {
             this.saveCheckpoint();
         }
         
-        // Update HUD
-        this.updateHUD();
+        // Update HUD (throttle: gak perlu tulis DOM tiap frame, biar ringan di HP)
+        if (this.frameCount % 4 === 0) this.updateHUD();
     },
     
     updatePlayer() {
@@ -1688,6 +1714,10 @@ const Game = {
                 size: 2 + Math.random() * 4
             });
         }
+        // Cap jumlah partikel — biar gak numpuk ratusan & bikin HP lemot
+        if (this.particles.length > 160) {
+            this.particles.splice(0, this.particles.length - 160);
+        }
     },
     
     updateParticles() {
@@ -2072,7 +2102,7 @@ const Game = {
         ctx.globalAlpha = base * m.alpha;
         ctx.fillStyle = '#f5f7ff';
         ctx.shadowColor = 'rgba(230,235,255,0.5)';
-        ctx.shadowBlur = 22;
+        ctx.shadowBlur = 22 * GLOW_SCALE;
         ctx.beginPath();
         ctx.arc(mx, my, m.size, 0, Math.PI * 2);
         ctx.fill();
@@ -2157,6 +2187,10 @@ const Game = {
     },
     
     drawThemeGlow(ctx, w, h, th) {
+        // Skip ambient glow full-screen di device low-power (radial gradient
+        // sebesar layar itu operasi mahal banget di GPU mobile).
+        // HP flagship (IS_MOBILE tapi bukan LOW_POWER) tetap dapat glow.
+        if (LOW_POWER) return;
         const base = ctx.globalAlpha;
         const glowPulse = 0.3 + Math.sin(this.frameCount * 0.02) * 0.15;
         const ambientGrad = ctx.createRadialGradient(
@@ -2269,7 +2303,7 @@ const Game = {
         
         // Main ground line (neon blue)
         ctx.shadowColor = 'rgba(100, 200, 255, 0.5)';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 10 * GLOW_SCALE;
         ctx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -2316,7 +2350,7 @@ const Game = {
                 ctx.strokeStyle = `rgba(100, 200, 255, ${0.1 + Math.random() * 0.2})`;
                 ctx.lineWidth = 1 + Math.random() * 2;
                 ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
-                ctx.shadowBlur = 5;
+                ctx.shadowBlur = 5 * GLOW_SCALE;
                 ctx.beginPath();
                 ctx.moveTo(lx, ly);
                 ctx.lineTo(lx - len, ly - Math.random() * 5);
@@ -2435,7 +2469,7 @@ const Game = {
                 const ty = -10 + Math.random() * 20;
                 ctx.fillStyle = 'rgba(100, 200, 255, 0.5)';
                 ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 8 * GLOW_SCALE;
                 ctx.beginPath();
                 ctx.arc(tx, ty, 2 + Math.random() * 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -2445,7 +2479,7 @@ const Game = {
         
         // === GLOW INTI ===
         ctx.shadowColor = 'rgba(150, 220, 255, 0.4)';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 20 * GLOW_SCALE;
         
         // === BADAN (TORSO) ===
         const gradBody = ctx.createLinearGradient(0, -35 + bounce, 0, -17 + bounce);
@@ -2460,7 +2494,7 @@ const Game = {
         ctx.fillRect(-1, -34 + bounce, 2, 16);
         
         // === KEPALA ===
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 15 * GLOW_SCALE;
         const gradHead = ctx.createRadialGradient(0, -42 + bounce, 2, 0, -42 + bounce, 9);
         gradHead.addColorStop(0, '#ffffff');
         gradHead.addColorStop(0.7, '#c0e8ff');
@@ -2478,7 +2512,7 @@ const Game = {
         ctx.fillRect(-3, -44 + bounce, 6, 1);
         
         // === LENGAN ===
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 8 * GLOW_SCALE;
         ctx.fillStyle = '#8ad4ff';
         
         // Lengan kiri
@@ -2502,7 +2536,7 @@ const Game = {
         ctx.restore();
         
         // === KAKI ===
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 8 * GLOW_SCALE;
         
         // Kaki kiri
         ctx.save();
@@ -2557,7 +2591,7 @@ const Game = {
             
             // === GLOW BASE ===
             ctx.shadowColor = 'rgba(255, 180, 100, 0.3)';
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 12 * GLOW_SCALE;
             
             switch(obs.type) {
                 case 0: // Box — neon crate
@@ -2621,7 +2655,7 @@ const Game = {
                     ctx.fillRect(ox + 2, oy, ow - 4, oh);
                     
                     // Top cap (glowing)
-                    ctx.shadowBlur = 15;
+                    ctx.shadowBlur = 15 * GLOW_SCALE;
                     ctx.fillStyle = `rgba(167, 139, 250, ${0.6 * pulse})`;
                     ctx.fillRect(ox, oy - 4, ow, 6);
                     
@@ -2683,7 +2717,7 @@ const Game = {
             ctx.fillRect(pit.x, gy - 3, pit.width, 6);
             // Glow effect
             ctx.shadowColor = 'rgba(255,255,255,0.3)';
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = 20 * GLOW_SCALE;
             ctx.fillRect(pit.x + 5, gy - 5, pit.width - 10, 4);
         } else {
             // Open pit - dark hole
@@ -2729,7 +2763,7 @@ const Game = {
             
             // Glow effect lebih terang
             ctx.shadowColor = 'rgba(255,255,255,0.5)';
-            ctx.shadowBlur = 25;
+            ctx.shadowBlur = 25 * GLOW_SCALE;
             
             ctx.translate(ft.x + walkX, ft.y + walkY - bounce);
             ctx.scale(ft.scale, ft.scale);
@@ -2752,7 +2786,7 @@ const Game = {
             ctx.stroke();
             
             // Teks dengan shadow
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 15 * GLOW_SCALE;
             ctx.fillStyle = '#fff';
             
             // Animasi per karakter (bergelombang)
@@ -2802,7 +2836,7 @@ const Game = {
             ctx.scale(s.scale + (1 - s.life) * 0.5, s.scale + (1 - s.life) * 0.5);
             // Glow
             ctx.shadowColor = 'rgba(100, 255, 100, 0.6)';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 15 * GLOW_SCALE;
             ctx.font = 'bold 20px "Inter", sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#66ff66';

@@ -5,7 +5,8 @@
     box-sizing: border-box;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800;900&display=swap');
+/* Font dimuat via <link> di index.html (dengan preconnect) — bukan @import,
+   supaya tidak render-blocking di mobile */
 
 :root {
     --bg: #0a0a0a;
@@ -1527,6 +1528,12 @@ html, body {
     .game-title h1 { font-size: 1.8rem; }
     .game-title .title-accent { font-size: 2.5rem; }
     .menu-btn { padding: 0.8rem 1.2rem; font-size: 0.85rem; }
+}
+
+/* ===== PERF MOBILE: kurangi backdrop-filter (mahal di GPU HP) ===== */
+@media (max-width: 768px), (pointer: coarse) {
+    #voiceIndicator { backdrop-filter: none; background: rgba(0,0,0,0.9); }
+    #pauseMenu, #gameOverScreen, #winScreen { backdrop-filter: none; }
 }
 
 /* ===== SCROLLBAR ===== */
