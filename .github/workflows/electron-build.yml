@@ -1,0 +1,230 @@
+# 🖥️ Build Voice Runner Desktop (Electron)
+# Workflow ini TERPISAH dari deploy.yml — hanya trigger saat ada perubahan di
+# electron/ package.json, atau file game yang relevan.
+# Hasil build (.exe, .dmg, .AppImage) di-upload ke GitHub Release yang SAMA
+# dengan release ZIP Itch.io dari deploy.yml.
+#
+# Jika release belum ada (misal trigger manual tanpa deploy.yml dulu),
+# workflow ini akan membuat release baru secara otomatis.
+
+name: 🖥️ Build Voice Runner Desktop (Electron)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'electron/**'
+      - 'package.json'
+      - 'index.html'
+      - 'js/**'
+      - 'css/**'
+      - 'assets/**'
+      - 'Music/**'
+  workflow_dispatch:
+
+jobs:
+  # ===== JOB 1: Cek kualitas + siapin versi =====
+  prepare:
+    name: 🔧 Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_exists: ${{ steps.tag_check.outputs.exists }}
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Cek kode JS
+        run: |
+          for file in js/*.js; do
+            echo "Checking $file..."
+            node --check "$file" 2>&1 || {
+              echo "❌ Syntax error in $file"
+              exit 1
+            }
+          done
+          echo "✅ All JavaScript files valid"
+
+      - name: 🏷️ Generate version
+        id: version
+        run: |
+          VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Version: $VERSION"
+
+      - name: 🔍 Cek apakah tag release sudah ada
+        id: tag_check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Tag $VERSION sudah ada — akan upload ke release yang ada"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "📦 Tag $VERSION belum ada — perlu buat release baru"
+          fi
+
+  # ===== JOB 2: Build Electron di Windows =====
+  build-windows:
+    name: 🪟 Build Windows
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Windows (portable .exe)
+        run: npm run electron:build:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceRunner-windows
+          path: dist-electron/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  # ===== JOB 3: Build Electron di macOS =====
+  build-macos:
+    name: 🍎 Build macOS
+    needs: prepare
+    runs-on: macos-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build macOS (.dmg)
+        run: npm run electron:build:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceRunner-macos
+          path: dist-electron/*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+  # ===== JOB 4: Build Electron di Linux =====
+  build-linux:
+    name: 🐧 Build Linux
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Linux (AppImage)
+        run: npm run electron:build:linux
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceRunner-linux
+          path: dist-electron/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+  # ===== JOB 5: Upload semua artifact ke GitHub Release =====
+  upload-release:
+    name: 📦 Upload to Release
+    needs: [prepare, build-windows, build-macos, build-linux]
+    # always() + kondisi prepare sukses — biar artifact yang gagal tetap skip, tapi
+    # yang sukses tetap ter-upload tanpa harus nunggu semua job sukses
+    if: ${{ always() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⬇️ Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: 📂 List downloaded artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find artifacts -type f -ls 2>/dev/null || echo "(no artifacts found)"
+          echo "==========================="
+
+      - name: 🏷️ Buat tag & release (kalau belum ada)
+        id: create_release
+        if: needs.prepare.outputs.tag_exists == 'false'
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "✅ Tag created: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 📦 Publish / Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: "Voice Runner ${{ needs.prepare.outputs.version }}"
+          files: |
+            artifacts/VoiceRunner-windows/*.exe
+            artifacts/VoiceRunner-macos/*.dmg
+            artifacts/VoiceRunner-linux/*.AppImage
+          body: |
+            ## 🖥️ Desktop Build ${{ needs.prepare.outputs.version }}
+            
+            **Commit:** ${{ github.event.head_commit.message || 'Manual trigger' }}
+            
+            ### 📥 Downloads
+            
+            | Platform | File | Status |
+            |----------|------|--------|
+            | 🪟 Windows | `VoiceRunner-*-win.exe` (portable) | ${{ needs.build-windows.result == 'success' && '✅' || '❌' }} |
+            | 🍎 macOS | `VoiceRunner-*-mac.dmg` | ${{ needs.build-macos.result == 'success' && '✅' || '❌' }} |
+            | 🐧 Linux | `VoiceRunner-*-linux.AppImage` | ${{ needs.build-linux.result == 'success' && '✅' || '❌' }} |
+            
+            > 💡 **Windows**: File `.exe` portable — langsung jalan, tidak perlu install.
+            > 💡 **macOS**: Setelah download, buka Terminal dan jalankan:
+            > `xattr -d com.apple.quarantine /path/to/VoiceRunner-*.dmg`
+            > 💡 **Linux**: Jadikan file executable: `chmod +x VoiceRunner-*.AppImage`
+            
+            ---
+            *Build #${{ github.run_number }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
