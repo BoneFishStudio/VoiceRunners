@@ -2,9 +2,6 @@
    GAME.JS - Voice Runner Core Engine
    ============================ */
 
-// Build info: electron-builder 26.15.3 + @noble/hashes 1.8.0 (CI diagnostic run)
-// Commit ini tidak mengubah logic — hanya trigger CI build untuk diagnosa.
-
 // ===== CONSTANTS =====
 const GRAVITY = 0.6;
 const GROUND_Y_RATIO = 0.78;
