@@ -21,6 +21,11 @@ on:
       - 'css/**'
       - 'assets/**'
       - 'Music/**'
+      # Perubahan workflow juga harus memicu build — deploy.yml bikin release+ZIP
+      # di SETIAP push tanpa filter paths, jadi kalau commit cuma mengubah
+      # .github/workflows/** dan electron-build tidak ikut jalan, release terbaru
+      # hanya berisi ZIP tanpa .exe/.dmg/.AppImage.
+      - '.github/workflows/**'
   workflow_dispatch:
 
 jobs:

@@ -1,0 +1,104 @@
+# 📤 Upload Electron Artifacts ke GitHub Release (tanpa rebuild)
+#
+# Untuk situasi: electron-build SUDAH sukses (artifact masih tersimpan 30 hari),
+# tapi release terbaru tidak berisi .exe/.dmg/.AppImage — misalnya karena commit
+# hanya mengubah .github/workflows/** yang tidak memicu electron-build.
+#
+# Cara pakai: GitHub → Actions → "📤 Upload Electron Artifacts ke Release" →
+# "Run workflow" (opsional: isi run_id / release_tag).
+#
+# Workflow ini TIDAK rebuild — cuma download artifact dari run electron-build
+# sukses terakhir, lalu upload ke release (membuat release kalau belum ada).
+
+name: 📤 Upload Electron Artifacts ke Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ID run electron-build (kosongkan = otomatis run sukses terakhir)'
+        required: false
+        default: ''
+      release_tag:
+        description: 'Tag release tujuan (kosongkan = otomatis pakai tag commit saat ini)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  # PENTING: gh run download butuh actions: read — kalau tidak ada, GITHUB_TOKEN
+  # default ke 'none' untuk scope ini dan download artifact gagal (403).
+  actions: read
+
+jobs:
+  upload:
+    name: 📦 Download & Upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Cari run electron-build sukses terakhir
+        id: find_run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ inputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            WF_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/electron-build.yml" --jq '.id')
+            RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/$WF_ID/runs?status=success&per_page=1" --jq '.workflow_runs[0].id')
+          fi
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "❌ Tidak ada run electron-build sukses ditemukan. Coba isi input 'run_id'."
+            exit 1
+          fi
+          echo "✅ Run electron-build dipakai: #$RUN_ID"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: ⬇️ Download artifacts dari run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download "${{ steps.find_run.outputs.run_id }}" --dir artifacts
+          echo "=== Artifacts ditemukan ==="
+          find artifacts -type f
+
+      - name: 🏷️ Tentukan tag release tujuan
+        id: tag
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+          fi
+          echo "🎯 Tag tujuan: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: 📦 Upload ke GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Buat release kalau belum ada
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Voice Runner $TAG" \
+              --notes "Release dibuat via upload-electron-artifacts (tanpa rebuild)."
+            echo "🆕 Release dibuat: $TAG"
+          else
+            echo "✅ Release sudah ada: $TAG"
+          fi
+
+          # Kumpulkan semua file executable dari artifact
+          FILES=$(find artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \))
+          if [ -z "$FILES" ]; then
+            echo "❌ Tidak ada .exe/.dmg/.AppImage di artifact!"
+            exit 1
+          fi
+
+          # Upload (--clobber = timpa asset yang sudah ada, idempotent)
+          # -d '\n' supaya path per baris (aman walau ada spasi)
+          echo "$FILES" | xargs -d '\n' gh release upload "$TAG" --clobber
+
+          echo "=== 📦 Isi release $TAG ==="
+          gh release view "$TAG" --json assets --jq '.assets[].name'
