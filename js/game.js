@@ -1856,7 +1856,9 @@ const Game = {
         // City → Forest → Night → Morning → Sore → ulang, tiap 800m,
         // dengan zona transisi 180m yang meng-crossfade ke tema berikutnya.
         // DEV: set THEME_PREVIEW_SPEED = 10 di console utk preview transisi cepat.
-        const blend = this.getThemeBlend(this.distance);
+        // Pakai themeDistance (bukan distance) supaya tema TIDAK lompat balik
+        // saat respawn di checkpoint — themeDistance tidak di-rewind.
+        const blend = this.getThemeBlend();
         this.currentTheme = blend.currentTheme;
         this.nextTheme = blend.nextTheme;
         this.blendProgress = blend.blendProgress;
