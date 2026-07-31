@@ -943,10 +943,14 @@ const Game = {
     createPit() {
         // ── DETERMINISTIC ── seeded RNG supaya sinkron multiplayer
         const pitWidth = 50 + this._rng() * 40;
+        // Daftar kata voice challenge — dipilih RANDOM tiap pit (pakai seeded RNG,
+        // jadi sinkron antar pemain di room yang sama). Diambil acak dari array
+        // SETIAP kali, jadi teks TIDAK AKAN PERNAH HABIS (boleh berulang tanpa batas).
         const textOptions = [
             "LARI", "LONCAT", "BERHENTI", "MAJU", "MUNDUR",
             "KIRI", "KANAN", "CEPAT", "LAMBAT", "PUTAR",
-            "TERBANG", "GESER", "HENTI", "DIAM", "AMBIL"
+            "TERBANG", "GESER", "HENTI", "DIAM", "AMBIL",
+            "MELOMPAT", "JALAN", "DUDUK", "ANGKAT", "BALIK"
         ];
         const text = textOptions[Math.floor(this._rng() * textOptions.length)];
         
@@ -1165,11 +1169,18 @@ const Game = {
             this.voiceDataArray = new Uint8Array(this.voiceAnalyser.frequencyBinCount);
             
             this.voiceEnabled = true;
+            this.micPermissionChecked = true; // izin didapat — jangan tanya ulang
             console.log('🎤 Voice volume detection started!');
             return true;
         } catch(e) {
             console.warn('Mic access failed:', e.message);
-            localStorage.setItem('voiceRunner_micPermission', 'denied');
+            // Hanya cache 'denied' kalau beneran ditolak user, bukan error transien
+            // (misal mic sedang dipakai app lain / device tidak ada)
+            if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' ||
+                      e.name === 'PermissionDeniedError')) {
+                localStorage.setItem('voiceRunner_micPermission', 'denied');
+            }
+            this.micPermissionChecked = true; // sudah dijawab — jangan tanya ulang
             this.voiceEnabled = false;
             return false;
         }
@@ -1391,6 +1402,15 @@ const Game = {
     // ===== VOICE RECOGNITION =====
     
     checkMicPermission() {
+        // ✅ Mic SUDAH aktif dari startVoiceVolumeDetection (game start) → langsung true.
+        // JANGAN minta izin ulang setiap ada text voice challenge!
+        if (this.voiceEnabled && this.voiceMicStream) return Promise.resolve(true);
+        
+        // Izin sudah tersimpan di localStorage → pakai hasil itu, jangan tanya lagi
+        const micPerm = localStorage.getItem('voiceRunner_micPermission');
+        if (micPerm === 'granted') return Promise.resolve(true);
+        if (micPerm === 'denied') return Promise.resolve(false);
+        
         // Cek apakah mic sudah pernah diizinkan
         if (this.micPermissionChecked) return Promise.resolve(true);
         
@@ -1407,11 +1427,19 @@ const Game = {
                     // Stop track biar ga boros resource
                     stream.getTracks().forEach(t => t.stop());
                     this.micPermissionChecked = true;
+                    // Simpan keputusan — konsisten dengan startVoiceVolumeDetection
+                    localStorage.setItem('voiceRunner_micPermission', 'granted');
                     resolve(true);
                 })
                 .catch((err) => {
                     console.warn('Mic permission denied:', err);
                     this.micPermissionChecked = true;
+                    // Hanya cache 'denied' kalau beneran ditolak, bukan error transien
+                    // (misal mic sedang dipakai app lain / device tidak ada)
+                    if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError' ||
+                                err.name === 'PermissionDeniedError')) {
+                        localStorage.setItem('voiceRunner_micPermission', 'denied');
+                    }
                     resolve(false);
                 });
         });
@@ -1451,6 +1479,8 @@ const Game = {
     },
     
     denyMic() {
+        // Simpan keputusan — jangan minta ulang di text berikutnya
+        localStorage.setItem('voiceRunner_micPermission', 'denied');
         if (window.__micPermissionResolve) {
             window.__micPermissionResolve(false);
             window.__micPermissionResolve = null;
@@ -1472,10 +1502,22 @@ const Game = {
         this.currentVoiceText = text;
         this.isListening = true;
         
+        // 🔇 Kalau user sudah pernah menolak → JANGAN tampilkan dialog lagi.
+        // Langsung auto-fill (sesuai request: "ketika ada text tidak akan di minta lagi").
+        if (localStorage.getItem('voiceRunner_micPermission') === 'denied') {
+            console.log('Mic sudah ditolak sebelumnya — auto-fill lubang');
+            setTimeout(() => {
+                if (this.activePit && !this.activePit.filled && !this.activePit.failed) {
+                    this.fillPit();
+                }
+            }, 2000);
+            return;
+        }
+        
         // Cek izin mic dulu
         this.checkMicPermission().then((granted) => {
             if (!granted) {
-                // Tampilkan dialog izin mic
+                // Pertama kali (belum ada keputusan) → tampilkan dialog izin mic
                 return this.showMicPermissionDialog();
             }
             return true;

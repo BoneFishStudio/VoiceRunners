@@ -87,6 +87,7 @@ function renderTheme(themeIdx, canvas) {
         sky: ['#5ec8ff', '#b8e6ff', '#f4fbff'],
         stars: 0, clouds: true,
         sun: { alpha: 0.85, size: 30, y: 0.16, clip: false },
+        moon: { alpha: 0 },
         mountains: 0, mountainsColor: '#cfe8f8',
         buildings: 0.2, buildingColor: '#3d6ea6',
         trees: 0, glow: { color: '130, 200, 255', strength: 0.05 }
@@ -97,6 +98,7 @@ function renderTheme(themeIdx, canvas) {
         sky: ['#8fdcae', '#c2efcf', '#eefaf0'],
         stars: 0, clouds: true,
         sun: { alpha: 0.55, size: 34, y: 0.2, clip: false },
+        moon: { alpha: 0 },
         mountains: 0.06, mountainsColor: '#4d8f6a',
         buildings: 0, buildingColor: '#2e6b4a',
         trees: 0.25, glow: { color: '100, 210, 140', strength: 0.05 }
@@ -177,7 +179,7 @@ function renderTheme(themeIdx, canvas) {
   }
 
   // === SUN ===
-  if (palette.sun.alpha > 0) {
+  if (palette.sun && palette.sun.alpha > 0) {
     const s = palette.sun;
     let sx = w * 0.72;
     let sy = h * s.y;
@@ -204,7 +206,7 @@ function renderTheme(themeIdx, canvas) {
   }
 
   // === MOON ===
-  if (palette.moon.alpha > 0) {
+  if (palette.moon && palette.moon.alpha > 0) {
     const m = palette.moon;
     const mx = w * 0.78;
     const my = h * m.y;
@@ -363,9 +365,11 @@ function buildGallery() {
 // ===== Switch theme highlight =====
 function switchTheme(idx) {
   document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-  document.getElementById('btn' + idx).classList.add('active');
+  const btn = document.getElementById('btn' + idx);
+  if (btn) btn.classList.add('active');
   currentTheme = idx;
-  document.getElementById('card-' + idx).scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const card = document.getElementById('card-' + idx);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ===== Capture all themes as images =====
