@@ -248,16 +248,16 @@
         <!-- Game Over -->
         <div id="gameOverScreen" class="overlay-hidden">
             <div class="gameover-container">
-                <h2>GAME OVER</h2>
+                <h2>💀 GAME OVER</h2>
                 <div class="gameover-stats">
-                    <p>Skor: <span id="finalScore">0</span></p>
-                    <p>Jarak: <span id="finalDistance">0</span> m</p>
+                    <p class="go-score">SKOR: <span id="finalScore">0</span></p>
+                    <p class="go-death">💀 Mati di <span id="finalDistance">0</span> m</p>
                 </div>
                 <div class="gameover-input">
                     <input type="text" id="playerName" placeholder="Nama kamu" maxlength="12">
                 </div>
-                <button class="menu-btn primary" onclick="saveScoreAndRestart()">💾 SIMPAN & MAIN LAGI</button>
-                <button class="menu-btn" onclick="watchAd()">📺 TONTON IKLAN (+1 Nyawa)</button>
+                <button class="menu-btn primary" onclick="watchAd()">📺 TONTON IKLAN — LANJUT DI SINI</button>
+                <button class="menu-btn" onclick="saveScoreAndRestart()">↻ MULAI DARI AWAL</button>
                 <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
             </div>
         </div>
@@ -402,8 +402,8 @@
                 <div class="instruction-item">
                     <span class="instr-icon">📍</span>
                     <div>
-                        <strong>3. Checkpoint Otomatis</strong>
-                        <p>Setiap 500 meter progress tersimpan. Kalau mati, respawn di sini!</p>
+                        <strong>3. Nyawa & Game Over</strong>
+                        <p>Nyawa habis = Game Over. Tonton iklan untuk lanjut dari titik kematian, atau mulai dari awal!</p>
                     </div>
                 </div>
             </div>
@@ -415,9 +415,9 @@
     <div id="adPlaceholder" class="overlay-hidden">
         <div class="confirm-dialog">
             <h3>📺 IKLAN</h3>
-            <p>Iklan akan ditampilkan di sini.</p>
-            <p class="ad-note">(Integrasi AdNetwork menyusul)</p>
-            <button class="menu-btn primary" onclick="closeAd()">TUTUP</button>
+            <p>Iklan diputar... Setelah selesai, kamu lanjut dari titik kematian!</p>
+            <p class="ad-note">(Integrasi AdNetwork menyusul — saat ini simulasi)</p>
+            <button class="menu-btn primary" onclick="closeAd()">✅ LANJUTKAN GAME</button>
         </div>
     </div>
 

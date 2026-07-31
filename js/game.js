@@ -603,6 +603,12 @@ const Game = {
         this.activePit = null;
         this.isListening = false;
         
+        // Reset checkpoint — kalau tidak, run berikutnya gak dapat checkpoint di 500m
+        // (karena kondisi `distance > checkpointDistance + 500` udah kepake)
+        this.checkpointDistance = 0;
+        this.checkpointScore = 0;
+        this.checkpointLives = this.maxLives;
+        
         // Reset voice state
         this.voiceVolume = 0;
         this.voiceJumpCooldown = 0;
@@ -641,7 +647,8 @@ const Game = {
     },
     
     gameLoop(timestamp) {
-        if (this.state === 'loading' || this.state === 'modeSelect' || this.state === 'menu') return;
+        if (this.state === 'loading' || this.state === 'modeSelect' || this.state === 'menu' ||
+            this.state === 'gameOver') return;
         
         // Handle countdown
         if (this.countdownValue > 0) {
@@ -1261,14 +1268,16 @@ const Game = {
         AudioManager.playSFX('score');
     },
     
-    respawnAtCheckpoint() {
-        // Pulihkan nyawa
-        this.lives = 3;
-        // Kembali ke jarak checkpoint
-        this.distance = this.checkpointDistance;
-        this.score = this.checkpointScore;
+    // ===== LANJUT SETELAH IKLAN (revive di titik kematian) =====
+    // User pilih "TONTON IKLAN" di Game Over → lanjut dari jarak & skor SAAT MATI,
+    // bukan dari awal. Nyawa dipulihkan penuh, arena di depan dibersihkan biar
+    // gak langsung nabrak rintangan yang sama lagi.
+    continueFromDeath() {
+        // Pulihkan nyawa penuh
+        this.lives = this.maxLives;
         
-        // Reset arena
+        // Jarak & skor PERTAHANKAN (titik kematian) — jangan reset ke 0!
+        // Bersihkan arena di depan player
         this.obstacles = [];
         this.pits = [];
         this.activePit = null;
@@ -1285,15 +1294,21 @@ const Game = {
         this.player.jumpLevel = 0;
         this.player.squash = 1;
         
-        // Hentikan voice recognition
+        // Hentikan voice recognition lama
         if (this.recognition) {
             try { this.recognition.stop(); } catch(e) {}
         }
         this.isListening = false;
         document.getElementById('voiceIndicator').classList.add('overlay-hidden');
         
-        // Tampilkan notifikasi
-        this.showCheckpointNotification();
+        // Mulai ulang voice volume detection (mic sempat di-stop saat game over)
+        this.startVoiceVolumeDetection();
+        
+        // Musik juga sempat di-stop saat game over — nyalakan lagi
+        this.startMusic();
+        
+        // Sembunyikan layar game over
+        document.getElementById('gameOverScreen').classList.add('overlay-hidden');
         
         // Update HUD
         this.updateHUD();
@@ -1301,7 +1316,15 @@ const Game = {
         // Kembalikan state ke bermain
         this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
         
-        console.log('📍 Respawn at checkpoint:', this.checkpointDistance + 'm');
+        // Restart sinkronisasi multiplayer kalau perlu
+        if (this.isMultiplayer && !this.mpUpdateInterval) {
+            this.mpUpdateInterval = setInterval(() => this.sendMPUpdate(), 100);
+        }
+        
+        // Mulai ulang game loop (loop berhenti saat state = gameOver)
+        requestAnimationFrame((t) => this.gameLoop(t));
+        
+        console.log('📺 Lanjut dari titik kematian:', Math.floor(this.distance) + 'm');
     },
     
     showCheckpointNotification() {
@@ -1774,12 +1797,9 @@ const Game = {
         this.updateHUD();
         
         if (this.lives <= 0) {
-            // Cek checkpoint! Kalau ada, respawn
-            if (this.checkpointDistance > 0) {
-                this.respawnAtCheckpoint();
-            } else {
-                this.gameOver();
-            }
+            // Nyawa habis → SELALU tampilkan Game Over (bukan auto-respawn).
+            // Lanjut dari titik kematian hanya lewat tombol TONTON IKLAN.
+            this.gameOver();
         }
     },
     
@@ -3004,9 +3024,8 @@ const Game = {
     },
     
     watchAd() {
-        if (this.lives < this.maxLives) {
-            document.getElementById('adPlaceholder').classList.remove('overlay-hidden');
-        }
+        // Placeholder: tampilkan dialog iklan. Integrasi AdNetwork menyusul.
+        document.getElementById('adPlaceholder').classList.remove('overlay-hidden');
     }
 };
 
@@ -3229,22 +3248,15 @@ function cancelExit() {
     document.getElementById('exitConfirm').classList.add('overlay-hidden');
 }
 
-// Ad placeholder
+// Ad placeholder — tombol "TONTON IKLAN" di Game Over
 function watchAd() {
-    document.getElementById('adPlaceholder').classList.remove('overlay-hidden');
+    Game.watchAd();
 }
 
 function closeAd() {
     document.getElementById('adPlaceholder').classList.add('overlay-hidden');
-    // Give +1 life
-    if (Game.lives < Game.maxLives) {
-        Game.lives++;
-        Game.updateHUD();
-        document.getElementById('gameOverScreen').classList.add('overlay-hidden');
-        Game.state = Game.isMultiplayer ? 'multiplayer' : 'solo';
-        // Restart game loop
-        requestAnimationFrame((t) => Game.gameLoop(t));
-    }
+    // Setelah "menonton iklan" → lanjut dari titik kematian
+    Game.continueFromDeath();
 }
 
 // ===== INIT =====

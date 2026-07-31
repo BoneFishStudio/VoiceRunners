@@ -840,6 +840,30 @@ html, body {
     font-weight: 700;
 }
 
+/* Skor akhir + catatan jarak kematian */
+.gameover-stats .go-score {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+}
+
+.gameover-stats .go-score span {
+    color: var(--warning);
+    font-size: 1.9rem;
+}
+
+.gameover-stats .go-death {
+    font-size: 1.05rem;
+    color: var(--danger);
+    margin-top: 0.15rem;
+}
+
+.gameover-stats .go-death span {
+    color: var(--danger);
+    font-weight: 800;
+}
+
 .gameover-input {
     margin-bottom: 1rem;
 }
