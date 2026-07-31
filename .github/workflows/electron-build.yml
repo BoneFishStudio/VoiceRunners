@@ -193,6 +193,8 @@ jobs:
           # kalau sudah ada — jadi race dengan deploy.yml (yang juga bikin tag
           # versi yang sama) tidak akan error lagi.
           tag_name: ${{ needs.prepare.outputs.version }}
+          # Tag harus menunjuk commit build yang presisi (bukan default-branch HEAD)
+          target_commitish: ${{ github.sha }}
           # JANGAN set body — biar body dari deploy.yml tidak tertimpa.
           # Kita cuma upload files ke release yang sama.
           files: |
@@ -203,5 +205,8 @@ jobs:
           update_existing: true
           # Jangan generate release notes (nanti timpa yang dari deploy)
           generate_release_notes: false
+          # NOTE: sengaja TIDAK pakai fail_on_unmatched_files — kalau salah satu
+          # platform gagal, glob platform itu di-skip dan sisanya tetap ter-upload
+          # (desain always() partial-upload).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
