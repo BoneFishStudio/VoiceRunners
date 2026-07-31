@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "🎤 Voice Runner — Endless runner game dengan voice control",
   "main": "electron/main.js",
-  "author": "BoneFishStudio",
+  "author": {
+    "name": "BoneFishStudio",
+    "email": "rozakadm@gmail.com"
+  },
   "license": "MIT",
   "scripts": {
     "electron:dev": "electron .",
@@ -66,6 +69,6 @@
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^26.15.3"
   }
 }
