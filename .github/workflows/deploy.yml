@@ -78,19 +78,45 @@ jobs:
       - name: ⚡ Install Vercel CLI
         run: npm install --global vercel@latest
 
+      # Cek secret wajib ada: VERCEL_ORG_ID + VERCEL_PROJECT_ID
+      # (VERCEL_TOKEN saja TIDAK cukup — Vercel CLI butuh kombinasi ini
+      #  supaya deploy mengarah ke project yang benar & ter-alias ke
+      #  domain production, bukan bikin project baru dengan URL hash acak.)
+      - name: 🔑 Cek Secret Vercel (ORG_ID + PROJECT_ID)
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "❌ Salah satu secret Vercel belum di-set!"
+            echo ""
+            echo "Cara set (1x saja): GitHub → Settings → Secrets and variables → Actions"
+            echo "  - VERCEL_TOKEN      : Vercel Dashboard → Settings → Tokens → Create Token"
+            echo "  - VERCEL_ORG_ID     : Vercel Dashboard → avatar/team → Settings → General → ID"
+            echo "  - VERCEL_PROJECT_ID : Vercel Dashboard → Project voice-runner → Settings → General → Project ID"
+            exit 1
+          fi
+          echo "✅ Secret Vercel lengkap (TOKEN + ORG_ID + PROJECT_ID)"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
       - name: 🔌 Pull Vercel Environment Information
         run: |
           vercel pull \
             --yes \
             --environment=production \
-            --token=${{ secrets.VERCEL_TOKEN }} \
-            --scope=${{ secrets.VERCEL_ORG_ID || '' }}
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: 🏗️ Build Project Artifacts
         run: |
           vercel build \
             --prod \
             --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: 🚀 Deploy to Vercel
         run: |
@@ -98,8 +124,10 @@ jobs:
             --prebuilt \
             --prod \
             --token=${{ secrets.VERCEL_TOKEN }} \
-            --scope=${{ secrets.VERCEL_ORG_ID || '' }} \
             2>&1 | tee deploy-output.txt
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: 🌍 Get Deployment URL
         id: deploy_url
