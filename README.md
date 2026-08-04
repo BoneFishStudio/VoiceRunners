@@ -2,7 +2,14 @@
 
 **Endless Runner HTML5** — lari otomatis, lompat pakai **suara**, isi lubang dengan **voice challenge**, dan main bareng 4 pemain via **multiplayer real-time**!
 
-> ⚡ **Coba sekarang**: Buka `index.html` di browser (Chrome/Edge rekomendasi)
+## 🎮 MAIN SEKARANG
+
+[![Main di Itch.io](https://img.shields.io/badge/Itch.io-Main%20di%20Itch-FF5C5C?style=for-the-badge&logo=itchdotio&logoColor=white)](https://mardev1.itch.io/voice-runner)
+[![Main Online](https://img.shields.io/badge/Vercel-Main%20Online-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://voicerunners.vercel.app)
+[![Bergabung dengan Komunitas](https://img.shields.io/badge/Discord-Bergabung%20dengan%20Komunitas-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/HbW8kJTJxf)
+[![Source Code](https://img.shields.io/badge/GitHub-Source%20Code-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/BoneFishStudio/VoiceRunners)
+
+> ⚡ **Coba cepat**: Buka `index.html` di browser (Chrome/Edge rekomendasi)
 
 ---
 
@@ -57,10 +64,34 @@
 ```
 
 ### Itch.io
+Game sudah live di: **https://mardev1.itch.io/voice-runner** 🎉
+
 ```bash
-1. Zip folder (index.html + js/ + css/ + Music/ + assets/)
+1. Zip folder (index.html + js/ + css/ + Music/ + assets/ + manifest.json + sw.js)
 2. Upload ke https://itch.io/game/new sebagai HTML
+3. Set viewport ke **1280x720**
 ```
+
+#### 🖼️ Embed Itch.io di website/README-mu
+```html
+<iframe src="https://itch.io/embed/GAME_ID?bg_color=0f0f1a&fg_color=ffffff&link_color=4bb8ff&border_color=333333" width="552" height="167" frameborder="0"><a href="https://mardev1.itch.io/voice-runner">Voice Runner by mardev1</a></iframe>
+```
+> 💡 **Cara dapat `GAME_ID`**: buka halaman game itch.io-mu → klik tombol **Embed** → salin angka di URL `https://itch.io/embed/<GAME_ID>` → ganti `GAME_ID` di kode di atas.
+
+---
+
+## 🤝 KOMUNITAS
+
+Bergabung dengan komunitas **Voice Runner** — diskusi, lapor bug, request fitur, atau sekadar nongkrong:
+
+[![Bergabung dengan Komunitas](https://img.shields.io/badge/Discord-Bergabung%20dengan%20Komunitas-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/HbW8kJTJxf)
+
+| Platform | Link |
+|----------|------|
+| 💬 **Discord** | [discord.gg/HbW8kJTJxf](https://discord.gg/HbW8kJTJxf)
+| 🐙 **GitHub** | [BoneFishStudio/VoiceRunners](https://github.com/BoneFishStudio/VoiceRunners) — issues & discussions
+| 🎮 **Itch.io** | [mardev1.itch.io/voice-runner](https://mardev1.itch.io/voice-runner)
+| 🌐 **Main Online** | [voicerunners.vercel.app](https://voicerunners.vercel.app)
 
 ---
 
