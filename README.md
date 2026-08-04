@@ -54,29 +54,14 @@
 
 ---
 
-## 🚀 DEPLOY
+## 🖼️ MAIN DI ITCH.IO
 
-### Vercel (Rekomendasi 🎯)
-```bash
-1. Push repo ke GitHub
-2. Buka https://vercel.com/new → Import repo
-3. Framework: "Other" → Deploy!
-```
+[![Main di Itch.io](https://img.shields.io/badge/Itch.io-Main%20di%20Itch-FF5C5C?style=for-the-badge&logo=itchdotio&logoColor=white)](https://mardev1.itch.io/voice-runner)
 
-### Itch.io
-Game sudah live di: **https://mardev1.itch.io/voice-runner** 🎉
-
-```bash
-1. Zip folder (index.html + js/ + css/ + Music/ + assets/ + manifest.json + sw.js)
-2. Upload ke https://itch.io/game/new sebagai HTML
-3. Set viewport ke **1280x720**
-```
-
-#### 🖼️ Embed Itch.io di website/README-mu
+Embed game di website-mu:
 ```html
-<iframe src="https://itch.io/embed/GAME_ID?bg_color=0f0f1a&fg_color=ffffff&link_color=4bb8ff&border_color=333333" width="552" height="167" frameborder="0"><a href="https://mardev1.itch.io/voice-runner">Voice Runner by mardev1</a></iframe>
+<iframe frameborder="0" src="https://itch.io/embed/4845636?bg_color=efefef&amp;border_color=070707" width="552" height="167"><a href="https://mardev1.itch.io/voice-runner">Voice Runner by TheCats</a></iframe>
 ```
-> 💡 **Cara dapat `GAME_ID`**: buka halaman game itch.io-mu → klik tombol **Embed** → salin angka di URL `https://itch.io/embed/<GAME_ID>` → ganti `GAME_ID` di kode di atas.
 
 ---
 
@@ -136,33 +121,6 @@ Voice pakai **Web Audio API (AnalyserNode)** — jalan di semua browser modern y
 ├── 📁 Music/             → File musik MP3
 ├── 📁 assets/            → Sprite, ikon PWA & aset
 └── 📁 .github/workflows/ → CI/CD auto-deploy ke Vercel + build Electron
-```
-
----
-
-## 🔒 FIREBASE SETUP (MANUAL DI CONSOLE — SEKALI SAJA)
-
-> ⚠️ **Tidak ada secret/config Firebase di repo ini.** Rules lengkap disimpan di [`docs/firebase-rules.json`](docs/firebase-rules.json).
-
-Lakukan ini di **Firebase Console → project `server-ba906`**:
-
-1. **Authentication → Sign-in method → Anonymous** → **Aktifkan** ✅
-2. **Realtime Database → Rules** → paste isi `docs/firebase-rules.json` (gabung dengan rules rooms yang sudah ada)
-3. **Realtime Database → Rules** — pastikan field `gameState` tetap divalidasi seperti rules yang kamu pakai sebelumnya
-
-> Catatan: `firebaseConfig` (apiKey, dsb.) hanya ada di `js/multiplayer.js` — wajib ada di client dan **bukan rahasia** (keamanan diatur oleh Security Rules + Auth, bukan menyembunyikan apiKey).
-
----
-
-## 🏠 LOCAL DEVELOPMENT
-
-```bash
-# Pakai Python (recommended)
-python -m http.server 8080
-# Buka http://localhost:8080
-
-# Atau VS Code Live Server
-# Klik kanan index.html → Open with Live Server
 ```
 
 ---
