@@ -36,18 +36,35 @@ const AudioManager = {
     },
     
     async initAudioContext() {
-        if (this.audioContext) return;
+        // FIX: JANGAN short-circuit kalau audioContext sudah ada — bisa jadi
+        // audioContext dibuat duluan oleh startVoiceVolumeDetection (mic),
+        // dan kalau kita return di sini, loadMusic() + generateSFX() tidak
+        // pernah jalan → game bisu total. Pakai flag _initDone terpisah.
+        if (this._initDone) return;
         try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.musicGain = this.audioContext.createGain();
-            this.musicGain.gain.value = this.musicVolume;
-            this.musicGain.connect(this.audioContext.destination);
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (!this.musicGain) {
+                this.musicGain = this.audioContext.createGain();
+                this.musicGain.gain.value = this.musicVolume;
+                this.musicGain.connect(this.audioContext.destination);
+            }
             
-            // Generate SFX
-            this.generateSFX();
+            // Generate SFX (sekali saja)
+            if (Object.keys(this.sfx).length === 0) {
+                this.generateSFX();
+            }
             
-            // Load music
-            await this.loadMusic();
+            // Load music (sekali saja — file MP3 5.1MB di-fetch lazy)
+            if (!this.musicBuffer) {
+                await this.loadMusic();
+            }
+            
+            this._initDone = true;
+            
+            // Auto-start musik begitu buffer siap
+            this.startMusic();
             
             console.log('Audio system initialized');
         } catch(e) {
