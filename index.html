@@ -7,9 +7,9 @@
     
     <!-- Open Graph / Social Share -->
     <meta property="og:title" content="Voice Runner">
-    <meta property="og:description" content="Lari. Lompat. Baca. Bertahan. — Game endless runner dengan voice challenge dan multiplayer 4 pemain!">
-    <meta property="og:image" content="https://YOUR-USERNAME.itch.io/YOUR-GAME/thumbnail.png">
-    <meta property="og:url" content="https://YOUR-USERNAME.itch.io/YOUR-GAME">
+    <meta property="og:description" content="Lari. Lompat. Teriak. Bertahan. — Endless runner dengan kontrol suara, TERIAK untuk mengisi lubang, multiplayer 4 pemain!">
+    <meta property="og:image" content="https://voicerunners.vercel.app/assets/icon-512.png">
+    <meta property="og:url" content="https://voicerunners.vercel.app">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Voice Runner">
     <meta name="twitter:card" content="summary_large_image">
@@ -17,10 +17,20 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="assets/icon.png">
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f0f1a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Voice Runner">
     <!-- Preconnect font utk load lebih cepat di mobile (render-blocking dikurangi) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800;900&display=swap">
+    <!-- Preload asset kritis yang kecil & dipakai awal (icon 1024px TIDAK di-preload biar hemat bandwidth) -->
+    <link rel="preload" as="image" href="assets/icon-192.png">
+    <link rel="preload" as="image" href="assets/runner_sprite.png">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -55,7 +65,7 @@
                         </button>
                     </div>
                     <div class="menu-footer">
-                        <p>🎤 Gunakan suaramu untuk mengisi lubang!</p>
+                        <p>🎤 Bersuara untuk lompat — TERIAK keras untuk mengisi lubang!</p>
                     </div>
                 </div>
             </div>
@@ -230,7 +240,7 @@
         <!-- Voice indicator -->
         <div id="voiceIndicator" class="overlay-hidden">
             <div class="voice-pulse"></div>
-            <span id="voiceText">🎤 Dengarkan teksnya...</span>
+            <span id="voiceText">🎤 TERIAK / BERSUARA KERAS!</span>
         </div>
 
         <!-- Checkpoint notification -->
@@ -350,7 +360,7 @@
             <div class="mic-icon">🎤</div>
             <h3>Akses Mikrofon Diperlukan</h3>
             <p>Voice Runner perlu akses mikrofon untuk fitur Voice Challenge!</p>
-            <p class="mic-detail">Bacakan teks yang muncul di atas lubang untuk mengisinya.</p>
+            <p class="mic-detail">Bersuara/teriak untuk melompat, dan TERIAK keras untuk mengisi lubang.</p>
             <div class="confirm-buttons">
                 <button class="menu-btn primary" onclick="Game.allowMic()">
                     <span class="btn-icon">✅</span> IZINKAN
@@ -395,8 +405,8 @@
                 <div class="instruction-item">
                     <span class="instr-icon">🕳️</span>
                     <div>
-                        <strong>2. Bacakan Teks!</strong>
-                        <p>Di lubang ada teks — bacakan dengan suara keras untuk mengisinya!</p>
+                        <strong>2. TERIAK untuk Mengisi Lubang!</strong>
+                        <p>Ada balon di atas lubang — TERIAK keras untuk memecahkannya, kotak jatuh mengisi lubang!</p>
                     </div>
                 </div>
                 <div class="instruction-item">
@@ -421,13 +431,25 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (app + auth + database) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <!-- Game Scripts -->
     <script src="js/audio.js"></script>
     <script src="js/multiplayer.js"></script>
     <script src="js/game.js"></script>
+
+    <!-- Register Service Worker (PWA) — hanya di http(s), bukan file:// (Electron) -->
+    <script>
+        if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.warn('SW registration failed:', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>

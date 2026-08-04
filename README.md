@@ -12,10 +12,11 @@
 |-------|-----------|
 | 🏃 **Endless Runner** | Lari otomatis, lompati rintangan dengan suara |
 | 🗣️ **Voice Jump** | Keras = lompat tinggi, pelan = lompat rendah |
-| 🎤 **Voice Challenge** | Baca teks untuk mengisi lubang |
+| 🎤 **Voice Challenge** | TERIAK keras untuk memecahkan balon & mengisi lubang |
 | 👥 **Multiplayer 4P** | Online real-time via Firebase |
 | 📍 **Checkpoint** | Auto-save tiap 500m, respawn kalau mati |
-| 🏆 **Leaderboard** | Skor tersimpan lokal |
+| 🏆 **Leaderboard** | Lokal + Global (Firebase, anonymous auth) |
+| 📱 **PWA** | Installable, offline shell via service worker |
 
 ---
 
@@ -28,13 +29,14 @@
 📢 KERAS   → Lompat tinggi  → Hindari TIANG
 ```
 
-### Voice Challenge
+### Voice Challenge (TERIAK!)
 ```
-🕳️ Lubang muncul + teks melayang (contoh: "LARI")
-🎤 Bacakan teks dengan suara
-✅ Cocok → lubang ketutup + bonus 50 poin
-❌ Gagal → jatuh (-1 nyawa)
+🕳️ Lubang muncul + balon & kotak di atasnya
+🎤 TERIAK KERAS (volume di atas threshold) beberapa frame
+💥 Balon pecah → kotak jatuh → lubang ketutup + bonus 50 poin
+❌ Diam saja → balon tidak pecah → jatuh ke lubang (-1 nyawa)
 ```
+> Tanpa mikrofon (ditolak/unsupported): lubang terisi otomatis setelah ±2.5 detik.
 
 ### Scoring
 | Aksi | Poin |
@@ -68,18 +70,21 @@
 |-----------|-------|
 | HTML5 Canvas | Semua rendering game |
 | Vanilla JS | Framework-free |
-| Web Speech API | Voice recognition |
-| Web Audio API | SFX + musik |
-| Firebase RTDB | Multiplayer sync |
-| localStorage | Save data |
+| Web Audio API | Voice volume (lompat & isi lubang) + SFX + musik |
+| Firebase RTDB | Multiplayer sync + leaderboard global |
+| Firebase Auth | Anonymous auth (identitas pemain) |
+| Service Worker | PWA offline shell |
+| localStorage | Save data + cache skor |
 
 ### Browser Support
+Voice pakai **Web Audio API (AnalyserNode)** — jalan di semua browser modern yang mendukung `getUserMedia` (bukan lagi SpeechRecognition yang cuma Chrome). Kalau izin mic ditolak, ada fallback otomatis.
+
 | Browser | Game | Voice | Multiplayer |
 |---------|------|-------|-------------|
 | Chrome ✅ | ✅ | ✅ | ✅ |
 | Edge ✅ | ✅ | ✅ | ✅ |
-| Firefox ✅ | ✅ | ❌ | ✅ |
-| Safari ✅ | ✅ | ❌ | ✅ |
+| Firefox ✅ | ✅ | ✅ | ✅ |
+| Safari ✅ | ✅ | ✅ | ✅ |
 
 ---
 
@@ -88,17 +93,78 @@
 ```
 📦 VoiceRunner
 ├── 📄 index.html        → Entry point + semua UI
+├── 📄 manifest.json     → PWA manifest
+├── 📄 sw.js             → Service worker (offline shell)
 ├── 📄 vercel.json       → Config Vercel
 ├── 📁 js/
 │   ├── 📄 game.js       → Core engine (game loop, physics, voice)
 │   ├── 📄 audio.js      → Web Audio API (musik + SFX)
-│   └── 📄 multiplayer.js → Firebase multiplayer
+│   └── 📄 multiplayer.js → Firebase multiplayer + auth + leaderboard global
 ├── 📁 css/
 │   └── 📄 style.css     → Styling
 ├── 📁 Music/             → File musik MP3
-├── 📁 assets/            → Sprite & aset
-└── 📁 .github/workflows/ → CI/CD auto-deploy ke Vercel
+├── 📁 assets/            → Sprite, ikon PWA & aset
+└── 📁 .github/workflows/ → CI/CD auto-deploy ke Vercel + build Electron
 ```
+
+---
+
+## 🔒 FIREBASE SECURITY RULES (WAJIB APPLY MANUAL)
+
+Apply di **Firebase Console → Realtime Database → Rules** (gabungkan dengan rules rooms yang sudah ada):
+
+```json
+{
+  "rules": {
+    "rooms": {
+      ".read": true,
+      "$room_id": {
+        ".read": true,
+        ".write": "!data.exists() || (data.child('status').val() === 'waiting')",
+        "players": {
+          "$player_id": {
+            ".validate": "newData.hasChildren(['id', 'name', 'score', 'distance', 'lives', 'alive', 'ready', 'joinedAt'])",
+            "id": { ".validate": "newData.isString()" },
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "score": { ".validate": "newData.isNumber()" },
+            "distance": { ".validate": "newData.isNumber()" },
+            "lives": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+            "alive": { ".validate": "newData.isBoolean()" },
+            "ready": { ".validate": "newData.isBoolean()" },
+            "joinedAt": { ".validate": "newData.isNumber()" }
+          }
+        },
+        "playerOrder": { ".validate": "newData.isArray()" },
+        "host": { ".validate": "newData.isString()" },
+        "status": { ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'playing')" },
+        "seed": { ".validate": "newData.isNumber()" },
+        "maxPlayers": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 4" },
+        "password": {
+          ".write": "!data.exists()",
+          ".validate": "newData.isString() && newData.val().length <= 64"
+        },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "startTime": { ".validate": "newData.isNumber()" }
+      }
+    },
+    "leaderboard": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "score": { ".validate": "newData.isNumber()" },
+        "distance": { ".validate": "newData.isNumber()" },
+        "timestamp": { ".validate": "newData.isNumber()" }
+      }
+    }
+  }
+}
+```
+
+**Setup yang perlu dilakukan manual di Firebase Console:**
+1. **Authentication → Sign-in method → Anonymous** → aktifkan ✅
+2. **Realtime Database → Rules** → paste rules di atas
+3. **Realtime Database → Rules** — pastikan field `gameState` tetap divalidasi seperti rules yang kamu pakai sebelumnya (contoh di atas versi ringkas; sesuaikan dengan node ekstra yang ada di data-mu)
 
 ---
 

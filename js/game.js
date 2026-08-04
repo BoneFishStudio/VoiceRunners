@@ -14,6 +14,11 @@ const OBSTACLE_MIN_GAP = 120;
 const OBSTACLE_MAX_GAP = 200;
 const PIT_CHANCE = 0.15;
 
+// ===== VOICE CHALLENGE VOLUME (mekanik baru: TERIAK, bukan baca kalimat) =====
+// Skala volume 0-1 (getByteTimeDomainData). Threshold di atasnya = lubang terisi.
+const PIT_VOLUME_THRESHOLD = 0.18;  // Volume minimal utk mengisi lubang
+const PIT_CHARGE_FRAMES = 6;        // Frame beruntun di atas threshold sebelum terisi (anti salah isi)
+
 // ===== SISTEM 5 TEMA BACKGROUND =====
 // Urutan siklus tema berdasarkan jarak (distance):
 // City → Forest → Night → Morning → Sore → ulang
@@ -286,16 +291,16 @@ const Game = {
         // Input handlers
         this.setupInput();
         
-        // Mulai musik untuk Main Menu
-        // Note: AudioContext butuh interaksi user dulu (click/tap)
-        // jadi musik akan mulai setelah user klik pertama
-        this.startMusic();
-        
-        // Resume audio context saat user pertama kali klik di mana saja
+        // Musik TIDAK di-load di init — file MP3 5.1MB baru di-fetch setelah
+        // interaksi pertama user (lazy-load), biar waktu buka pertama cepat,
+        // terutama penting untuk PWA di jaringan lambat. AudioContext juga
+        // wajib di-resume dari user gesture.
         document.addEventListener('click', () => {
             if (AudioManager.audioContext && AudioManager.audioContext.state === 'suspended') {
                 AudioManager.audioContext.resume();
             }
+            // Lazy-load musik: initAudioContext → fetch+decode MP3 → auto-start
+            this.startMusic();
         }, { once: true });
         
         console.log('Voice Runner initialized!');
@@ -861,6 +866,11 @@ const Game = {
                 this.scorePopups.splice(i, 1);
             }
         }
+        
+        // Cap jumlah score popups — biar tidak menumpuk di HP
+        if (this.scorePopups.length > 30) {
+            this.scorePopups.splice(0, this.scorePopups.length - 30);
+        }
     },
     
     emitLandingSplash(x, y) {
@@ -962,12 +972,22 @@ const Game = {
             case 2: obsWidth = 20 + this._rng() * 8; break;
         }
         
+        // ── DETERMINISTIC ── variant & hitbox juga dari seeded RNG (sinkron multiplayer)
+        const variant = Math.floor(this._rng() * 3);
+        // Hitbox proporsional ke bentuk visual:
+        // - Box: inset kecil (3px) — bentuknya persegi penuh
+        // - Spike: inset horizontal 20% tiap sisi — segitiga menyempit ke atas
+        // - Pillar: inset minimal (2px)
+        const hitInset = type === 1 ? Math.floor(obsWidth * 0.2) : (type === 0 ? 3 : 2);
+        
         this.obstacles.push({
             x: this.logicalW + 50,
             y: obsY,
             width: obsWidth,
             height: obsHeight,
             type: type,
+            variant: variant,
+            hitInset: hitInset,
             passed: false,
             voiceLevel: type === 0 ? 2 : type === 1 ? 1 : 3
         });
@@ -993,29 +1013,22 @@ const Game = {
             text: text,
             active: true,
             filled: false,
-            failed: false
+            failed: false,
+            charge: 0,          // Akumulasi frame suara keras (volume-based fill)
+            fallbackTimer: 0    // Timer auto-fill kalau mic tidak aktif
         };
         
-        // Create floating text with animation properties
-        this.floatingTexts.push({
-            x: this.logicalW + 50 + pitWidth / 2,
-            y: this.logicalH * 0.4,
-            text: text,
-            opacity: 1,
-            scale: 1,
-            walkPhase: 0,  // Untuk animasi berjalan
-            floatOffset: 0,
-            bouncePhase: 0,
-            wavePhase: 0,
-            charOffsets: [] // Per karakter offset
-        });
-        
-        // Start listening
-        setTimeout(() => {
-            if (this.activePit && !this.activePit.filled && !this.activePit.failed) {
-                this.startVoiceRecognition(text);
+        // 🎤 MEKANIK BARU: cukup TERIAK keras untuk mengisi lubang.
+        // Tidak ada teks yang harus dibaca & tidak minta izin mic ulang
+        // (mic sudah aktif sejak awal game via startVoiceVolumeDetection).
+        if (this.voiceEnabled) {
+            const indicator = document.getElementById('voiceIndicator');
+            if (indicator) {
+                indicator.classList.remove('overlay-hidden');
+                document.getElementById('voiceText').textContent = '🎤 TERIAK / BERSUARA KERAS!';
+                document.querySelector('.voice-pulse').className = 'voice-pulse listening';
             }
-        }, 500);
+        }
     },
     
     updateObstacles() {
@@ -1054,15 +1067,44 @@ const Game = {
     updatePits() {
         if (!this.activePit) return;
         
-        this.activePit.x -= this.gameSpeed;
+        const pit = this.activePit;
+        pit.x -= this.gameSpeed;
+        if (pit.popTimer > 0) pit.popTimer--;
+        
+        // 🎤 MEKANIK BARU: isi lubang pakai VOLUME suara (bukan speech-to-text).
+        // Kalau mic aktif: tahan suara keras di atas threshold beberapa frame → isi.
+        // Kalau mic mati/ditolak: fallback otomatis terisi setelah ~2.5 detik.
+        if (!pit.filled && !pit.failed) {
+            if (this.voiceEnabled) {
+                const vol = this.getVoiceVolume();
+                this.voiceVolume = vol;
+                // Feedback real-time ke HUD volume bar saat ada pit aktif
+                if (vol > 0.06) {
+                    this.showVolumeFeedback(vol, vol > 0.25 ? 3 : vol > 0.12 ? 2 : 1);
+                }
+                if (vol > PIT_VOLUME_THRESHOLD) {
+                    pit.charge = (pit.charge || 0) + 1;
+                    if (pit.charge >= PIT_CHARGE_FRAMES) {
+                        this.fillPit();
+                        return;
+                    }
+                } else {
+                    pit.charge = 0;
+                }
+            } else {
+                // Fallback tanpa mikrofon (Firefox/Safari/ditolak): auto-fill
+                pit.fallbackTimer = (pit.fallbackTimer || 0) + 1;
+                if (pit.fallbackTimer > 150) {
+                    this.fillPit();
+                    return;
+                }
+            }
+        }
         
         // Remove pit if off screen (without being filled)
-        if (this.activePit.x + this.activePit.width < -50) {
+        if (pit.x + pit.width < -50) {
             this.activePit = null;
             this.isListening = false;
-            if (this.recognition) {
-                try { this.recognition.stop(); } catch(e) {}
-            }
             document.getElementById('voiceIndicator').classList.add('overlay-hidden');
         }
     },
@@ -1413,9 +1455,11 @@ const Game = {
         
         // Slightly smaller hitbox for fair gameplay
         const margin = 4;
+        // Hitbox proporsional bentuk visual (dipakai dari obs.hitInset)
+        const hi = obs.hitInset || 0;
         return (
-            obs.x + margin < px + pw - margin &&
-            obs.x + obs.width - margin > px + margin &&
+            obs.x + hi + margin < px + pw - margin &&
+            obs.x + obs.width - hi - margin > px + margin &&
             obs.y + margin < py + ph - margin &&
             obs.y + obs.height - margin > py + margin
         );
@@ -1686,6 +1730,7 @@ const Game = {
         
         this.activePit.filled = true;
         this.activePit.active = false;
+        this.activePit.popTimer = 12; // Animasi balon pecah (mengecil + partikel)
         this.isListening = false;
         
         if (this.recognition) {
@@ -1831,6 +1876,12 @@ const Game = {
             document.getElementById('playerName').value = savedName;
         }
         
+        // 🌍 Simpan skor ke GLOBAL leaderboard (Firebase, anonymous auth) — best-effort.
+        // Tetap simpan ke localStorage juga sebagai cache/fallback offline.
+        if (typeof saveGlobalLeaderboard === 'function') {
+            saveGlobalLeaderboard(savedName || 'Anonim', this.score, Math.floor(this.distance));
+        }
+        
         // Clear multiplayer interval
         if (this.mpUpdateInterval) {
             clearInterval(this.mpUpdateInterval);
@@ -1849,6 +1900,11 @@ const Game = {
         
         // Save to leaderboard
         this.saveToLeaderboard(name, this.score, Math.floor(this.distance));
+        
+        // 🌍 Simpan juga ke GLOBAL leaderboard (Firebase) — best-effort
+        if (typeof saveGlobalLeaderboard === 'function') {
+            saveGlobalLeaderboard(name, this.score, Math.floor(this.distance));
+        }
         
         // Reset and play again
         document.getElementById('gameOverScreen').classList.add('overlay-hidden');
@@ -2120,13 +2176,16 @@ const Game = {
         const my = h * m.y;
         ctx.save();
         ctx.globalAlpha = base * m.alpha;
+        // Halo bulan pakai radial gradient (murah) — bukan shadowBlur (mahal per-frame)
+        const halo = ctx.createRadialGradient(mx, my, m.size * 0.5, mx, my, m.size * 2.2);
+        halo.addColorStop(0, 'rgba(230,235,255,0.35)');
+        halo.addColorStop(1, 'rgba(230,235,255,0)');
+        ctx.fillStyle = halo;
+        ctx.fillRect(mx - m.size * 2.2, my - m.size * 2.2, m.size * 4.4, m.size * 4.4);
         ctx.fillStyle = '#f5f7ff';
-        ctx.shadowColor = 'rgba(230,235,255,0.5)';
-        ctx.shadowBlur = 22 * GLOW_SCALE;
         ctx.beginPath();
         ctx.arc(mx, my, m.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
         // Kawah sederhana
         ctx.fillStyle = 'rgba(200,210,235,0.4)';
         ctx.beginPath(); ctx.arc(mx - 9, my - 5, 5, 0, Math.PI * 2); ctx.fill();
@@ -2321,9 +2380,7 @@ const Game = {
         ctx.fillStyle = groundGlow;
         ctx.fillRect(0, gy - 4, w, 8);
         
-        // Main ground line (neon blue)
-        ctx.shadowColor = 'rgba(100, 200, 255, 0.5)';
-        ctx.shadowBlur = 10 * GLOW_SCALE;
+        // Main ground line (neon blue) — glow via gradient band di atas, tanpa shadowBlur
         ctx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -2369,8 +2426,6 @@ const Game = {
                 const len = 20 + Math.random() * 40;
                 ctx.strokeStyle = `rgba(100, 200, 255, ${0.1 + Math.random() * 0.2})`;
                 ctx.lineWidth = 1 + Math.random() * 2;
-                ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
-                ctx.shadowBlur = 5 * GLOW_SCALE;
                 ctx.beginPath();
                 ctx.moveTo(lx, ly);
                 ctx.lineTo(lx - len, ly - Math.random() * 5);
@@ -2488,8 +2543,6 @@ const Game = {
                 const tx = -20 - Math.random() * 30;
                 const ty = -10 + Math.random() * 20;
                 ctx.fillStyle = 'rgba(100, 200, 255, 0.5)';
-                ctx.shadowColor = 'rgba(100, 200, 255, 0.3)';
-                ctx.shadowBlur = 8 * GLOW_SCALE;
                 ctx.beginPath();
                 ctx.arc(tx, ty, 2 + Math.random() * 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -2497,9 +2550,8 @@ const Game = {
             ctx.restore();
         }
         
-        // === GLOW INTI ===
-        ctx.shadowColor = 'rgba(150, 220, 255, 0.4)';
-        ctx.shadowBlur = 20 * GLOW_SCALE;
+        // === GLOW INTI (dinonaktifkan utk performa — outline kontras per tema sudah cukup) ===
+        ctx.shadowBlur = 0;
         
         // === BADAN (TORSO) ===
         const gradBody = ctx.createLinearGradient(0, -35 + bounce, 0, -17 + bounce);
@@ -2514,7 +2566,7 @@ const Game = {
         ctx.fillRect(-1, -34 + bounce, 2, 16);
         
         // === KEPALA ===
-        ctx.shadowBlur = 15 * GLOW_SCALE;
+        ctx.shadowBlur = 0;
         const gradHead = ctx.createRadialGradient(0, -42 + bounce, 2, 0, -42 + bounce, 9);
         gradHead.addColorStop(0, '#ffffff');
         gradHead.addColorStop(0.7, '#c0e8ff');
@@ -2532,7 +2584,7 @@ const Game = {
         ctx.fillRect(-3, -44 + bounce, 6, 1);
         
         // === LENGAN ===
-        ctx.shadowBlur = 8 * GLOW_SCALE;
+        ctx.shadowBlur = 0;
         ctx.fillStyle = '#8ad4ff';
         
         // Lengan kiri
@@ -2556,7 +2608,7 @@ const Game = {
         ctx.restore();
         
         // === KAKI ===
-        ctx.shadowBlur = 8 * GLOW_SCALE;
+        ctx.shadowBlur = 0;
         
         // Kaki kiri
         ctx.save();
@@ -2596,6 +2648,35 @@ const Game = {
         ctx.restore();
     },
     
+    // Path spike sesuai variant (dipakai untuk fill & outline biar konsisten)
+    traceSpikePath(ctx, ox, oy, ow, oh, v) {
+        if (v === 1) {
+            // Zigzag 3 spike kecil
+            ctx.moveTo(ox, oy + oh);
+            const n = 3;
+            for (let i = 0; i < n; i++) {
+                const sx = ox + (ow / n) * i;
+                ctx.lineTo(sx + ow / (n * 2), oy + oh * 0.25);
+                ctx.lineTo(sx + ow / n, oy + oh);
+            }
+            ctx.closePath();
+        } else if (v === 2) {
+            // Spike lebar dengan alas trapesium
+            ctx.moveTo(ox + ow * 0.12, oy + oh);
+            ctx.lineTo(ox + ow / 2, oy);
+            ctx.lineTo(ox + ow * 0.88, oy + oh);
+            ctx.lineTo(ox + ow, oy + oh);
+            ctx.lineTo(ox, oy + oh);
+            ctx.closePath();
+        } else {
+            // Segitiga tunggal
+            ctx.moveTo(ox, oy + oh);
+            ctx.lineTo(ox + ow / 2, oy);
+            ctx.lineTo(ox + ow, oy + oh);
+            ctx.closePath();
+        }
+    },
+    
     drawObstacles(ctx) {
         const pulse = Math.sin(this.frameCount * 0.05) * 0.15 + 0.85; // Pulse animasi
         // Hitung sekali di luar loop (bukan per-objek)
@@ -2609,12 +2690,11 @@ const Game = {
             const ow = obs.width;
             const oh = obs.height;
             
-            // === GLOW BASE ===
-            ctx.shadowColor = 'rgba(255, 180, 100, 0.3)';
-            ctx.shadowBlur = 12 * GLOW_SCALE;
+            // === GLOW BASE (dihapus utk performa — solid + outline sudah kontras) ===
+            ctx.shadowBlur = 0;
             
             switch(obs.type) {
-                case 0: // Box — neon crate
+                case 0: // Box — neon crate (variant dekorasi: X / stripes / diagonal+bolt)
                     // Gradient body
                     const boxGrad = ctx.createLinearGradient(ox, oy, ox + ow, oy + oh);
                     boxGrad.addColorStop(0, '#ff8c42');
@@ -2623,50 +2703,68 @@ const Game = {
                     ctx.fillStyle = boxGrad;
                     ctx.fillRect(ox, oy, ow, oh);
                     
-                    // Border dalam (glow line)
-                    ctx.shadowBlur = 0;
+                    // Border dalam
                     ctx.strokeStyle = `rgba(255, 200, 150, ${0.3 * pulse})`;
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(ox + 3, oy + 3, ow - 6, oh - 6);
                     
-                    // X mark di tengah
+                    // Dekorasi per variant (deterministic dari seed)
+                    const boxV = obs.variant || 0;
                     ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 * pulse})`;
                     ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(ox + 5, oy + 5);
-                    ctx.lineTo(ox + ow - 5, oy + oh - 5);
-                    ctx.moveTo(ox + ow - 5, oy + 5);
-                    ctx.lineTo(ox + 5, oy + oh - 5);
-                    ctx.stroke();
+                    if (boxV === 0) {
+                        // X mark
+                        ctx.beginPath();
+                        ctx.moveTo(ox + 5, oy + 5);
+                        ctx.lineTo(ox + ow - 5, oy + oh - 5);
+                        ctx.moveTo(ox + ow - 5, oy + 5);
+                        ctx.lineTo(ox + 5, oy + oh - 5);
+                        ctx.stroke();
+                    } else if (boxV === 1) {
+                        // Stripes horizontal
+                        for (let sy = oy + oh / 3; sy < oy + oh - 4; sy += 6) {
+                            ctx.beginPath();
+                            ctx.moveTo(ox + 4, sy);
+                            ctx.lineTo(ox + ow - 4, sy);
+                            ctx.stroke();
+                        }
+                    } else {
+                        // Diagonal + corner bolts
+                        ctx.beginPath();
+                        ctx.moveTo(ox + 4, oy + 4);
+                        ctx.lineTo(ox + ow - 4, oy + oh - 4);
+                        ctx.stroke();
+                        ctx.fillStyle = `rgba(255,255,255,${0.35 * pulse})`;
+                        ctx.fillRect(ox + 3, oy + 3, 3, 3);
+                        ctx.fillRect(ox + ow - 6, oy + 3, 3, 3);
+                        ctx.fillRect(ox + 3, oy + oh - 6, 3, 3);
+                        ctx.fillRect(ox + ow - 6, oy + oh - 6, 3, 3);
+                    }
                     break;
                     
-                case 1: // Spike — neon red
-                    ctx.shadowColor = 'rgba(255, 80, 80, 0.4)';
+                case 1: // Spike — neon red (variant: segitiga / zigzag 3 / trapesium)
                     const spikeGrad = ctx.createLinearGradient(ox, oy + oh, ox + ow / 2, oy);
                     spikeGrad.addColorStop(0, '#ff4444');
                     spikeGrad.addColorStop(0.5, '#ff6666');
                     spikeGrad.addColorStop(1, '#ff8888');
                     ctx.fillStyle = spikeGrad;
-                    
+                    const spV = obs.variant || 0;
                     ctx.beginPath();
-                    ctx.moveTo(ox, oy + oh);
-                    ctx.lineTo(ox + ow / 2, oy);
-                    ctx.lineTo(ox + ow, oy + oh);
-                    ctx.closePath();
+                    this.traceSpikePath(ctx, ox, oy, ow, oh, spV);
                     ctx.fill();
                     
-                    // Glow line di tengah spike
-                    ctx.shadowBlur = 0;
-                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 * pulse})`;
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(ox + ow / 2, oy + 3);
-                    ctx.lineTo(ox + ow / 2, oy + oh - 3);
-                    ctx.stroke();
+                    // Garis tengah (hanya variant segitiga/trapesium)
+                    if (spV !== 1) {
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 * pulse})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(ox + ow / 2, oy + 3);
+                        ctx.lineTo(ox + ow / 2, oy + oh - 3);
+                        ctx.stroke();
+                    }
                     break;
                     
-                case 2: // Pillar — neon purple
-                    ctx.shadowColor = 'rgba(180, 100, 255, 0.3)';
+                case 2: // Pillar — neon purple (variant: 1 garis / 2 garis+band / antena)
                     const pillarGrad = ctx.createLinearGradient(ox + 2, oy, ox + ow - 2, oy + oh);
                     pillarGrad.addColorStop(0, '#8b5cf6');
                     pillarGrad.addColorStop(0.5, '#a78bfa');
@@ -2674,19 +2772,40 @@ const Game = {
                     ctx.fillStyle = pillarGrad;
                     ctx.fillRect(ox + 2, oy, ow - 4, oh);
                     
-                    // Top cap (glowing)
-                    ctx.shadowBlur = 15 * GLOW_SCALE;
+                    // Top cap
                     ctx.fillStyle = `rgba(167, 139, 250, ${0.6 * pulse})`;
                     ctx.fillRect(ox, oy - 4, ow, 6);
                     
-                    // Detail garis vertikal
-                    ctx.shadowBlur = 0;
+                    // Detail per variant
+                    const pV = obs.variant || 0;
                     ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * pulse})`;
                     ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(ox + ow / 2, oy + 5);
-                    ctx.lineTo(ox + ow / 2, oy + oh - 5);
-                    ctx.stroke();
+                    if (pV === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(ox + ow / 2, oy + 5);
+                        ctx.lineTo(ox + ow / 2, oy + oh - 5);
+                        ctx.stroke();
+                    } else if (pV === 1) {
+                        // Dua garis vertikal + band tengah
+                        for (const px2 of [ow * 0.33, ow * 0.66]) {
+                            ctx.beginPath();
+                            ctx.moveTo(ox + px2, oy + 5);
+                            ctx.lineTo(ox + px2, oy + oh - 5);
+                            ctx.stroke();
+                        }
+                        ctx.fillStyle = `rgba(167, 139, 250, ${0.25 * pulse})`;
+                        ctx.fillRect(ox + 1, oy + oh * 0.45, ow - 2, 4);
+                    } else {
+                        // Antena di atas
+                        ctx.beginPath();
+                        ctx.moveTo(ox + ow / 2, oy - 4);
+                        ctx.lineTo(ox + ow / 2, oy - 14);
+                        ctx.stroke();
+                        ctx.fillStyle = `rgba(167, 139, 250, ${0.5 * pulse})`;
+                        ctx.beginPath();
+                        ctx.arc(ox + ow / 2, oy - 16, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                     break;
             }
             
@@ -2699,12 +2818,9 @@ const Game = {
                 case 0: // Box
                     ctx.strokeRect(ox, oy, ow, oh);
                     break;
-                case 1: // Spike — stroke segitiga
+                case 1: // Spike — stroke mengikuti variant
                     ctx.beginPath();
-                    ctx.moveTo(ox, oy + oh);
-                    ctx.lineTo(ox + ow / 2, oy);
-                    ctx.lineTo(ox + ow, oy + oh);
-                    ctx.closePath();
+                    this.traceSpikePath(ctx, ox, oy, ow, oh, obs.variant || 0);
                     ctx.stroke();
                     break;
                 case 2: // Pillar
@@ -2735,10 +2851,33 @@ const Game = {
             // Filled pit - show bridge/platform
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
             ctx.fillRect(pit.x, gy - 3, pit.width, 6);
-            // Glow effect
-            ctx.shadowColor = 'rgba(255,255,255,0.3)';
-            ctx.shadowBlur = 20 * GLOW_SCALE;
+            // Garis terang tanpa shadowBlur
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
             ctx.fillRect(pit.x + 5, gy - 5, pit.width - 10, 4);
+            
+            // 💥 Balon pecah: mengecil cepat + partikel kecil (animasi singkat)
+            const popTimer = pit.popTimer || 0;
+            if (popTimer > 0) {
+                const popScale = popTimer / 12;
+                const bx = pit.x + pit.width / 2;
+                const by = gy - 34 - (12 - popTimer) * 2;
+                const br = 13 * popScale;
+                if (br > 0.5) {
+                    ctx.fillStyle = `rgba(255,255,255,${0.9 * popScale})`;
+                    ctx.beginPath();
+                    ctx.ellipse(bx, by, br, br * 1.25, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Partikel kecil menyebar
+                ctx.fillStyle = `rgba(255,255,255,${0.6 * popScale})`;
+                for (let i = 0; i < 6; i++) {
+                    const ang = (i / 6) * Math.PI * 2 + (12 - popTimer) * 0.3;
+                    const pr = 5 + (12 - popTimer) * 1.5;
+                    ctx.beginPath();
+                    ctx.arc(bx + Math.cos(ang) * pr, by + Math.sin(ang) * pr * 0.8, 1.5 + popScale, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         } else {
             // Open pit - dark hole
             const grad = ctx.createLinearGradient(0, gy, 0, gy + 40);
@@ -2756,6 +2895,67 @@ const Game = {
             ctx.lineTo(pit.x + pit.width, gy);
             ctx.stroke();
             ctx.setLineDash([]);
+            
+            // ===== BALON + KOTAK (visual voice challenge baru) =====
+            // Balon di atas, tali tipis, kotak di bawah di atas lubang.
+            // Suara keras mengisi "charge" balon → balon membesar sedikit →
+            // saat penuh: balon pecah + kotak jatuh mengisi lubang (fillPit).
+            const chargeRatio = Math.min((pit.charge || 0) / PIT_CHARGE_FRAMES, 1);
+            const boxW = Math.min(26, pit.width - 12);
+            const boxX = pit.x + (pit.width - boxW) / 2;
+            const boxY = gy - 15;
+            const liftY = chargeRatio * 8; // Balon & tali terangkat saat charge
+            const outlineC = this.getObstacleOutlineColor();
+            
+            // Tali tipis
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(boxX + boxW / 2, boxY);
+            ctx.lineTo(boxX + boxW / 2, boxY - 30 - liftY);
+            ctx.stroke();
+            
+            // Balon (siluet monokrom, membesar saat charge)
+            const br = 12 + chargeRatio * 4;
+            const bx = boxX + boxW / 2;
+            const by = boxY - 32 - liftY - br * 1.2;
+            const balloonPulse = 1 + Math.sin(this.frameCount * 0.12) * 0.05;
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.beginPath();
+            ctx.ellipse(bx, by, br * balloonPulse, br * 1.25 * balloonPulse, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Simpul balon
+            ctx.beginPath();
+            ctx.moveTo(bx, by + br * 1.2);
+            ctx.lineTo(bx - 3, by + br * 1.2 + 5);
+            ctx.lineTo(bx + 3, by + br * 1.2 + 5);
+            ctx.closePath();
+            ctx.fill();
+            // Kilau kecil di balon (efek glossy murah, tanpa shadowBlur)
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.beginPath();
+            ctx.ellipse(bx - br * 0.35, by - br * 0.4, br * 0.22, br * 0.32, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+            // Outline kontras tema
+            ctx.strokeStyle = outlineC;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.ellipse(bx, by, br * balloonPulse, br * 1.25 * balloonPulse, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Kotak (siluet kotak crate di atas lubang)
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillRect(boxX, boxY, boxW, 15);
+            // Garis tengah kotak + outline
+            ctx.strokeStyle = outlineC;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(boxX, boxY, boxW, 15);
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(boxX, boxY + 7.5);
+            ctx.lineTo(boxX + boxW, boxY + 7.5);
+            ctx.stroke();
         }
         
         ctx.restore();
@@ -2781,9 +2981,8 @@ const Game = {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Glow effect lebih terang
-            ctx.shadowColor = 'rgba(255,255,255,0.5)';
-            ctx.shadowBlur = 25 * GLOW_SCALE;
+            // Glow via backdrop pill (tanpa shadowBlur)
+            ctx.shadowBlur = 0;
             
             ctx.translate(ft.x + walkX, ft.y + walkY - bounce);
             ctx.scale(ft.scale, ft.scale);
@@ -2805,8 +3004,8 @@ const Game = {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Teks dengan shadow
-            ctx.shadowBlur = 15 * GLOW_SCALE;
+            // Teks polos (outline gelap sudah cukup kontras)
+            ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff';
             
             // Animasi per karakter (bergelombang)
@@ -2854,9 +3053,8 @@ const Game = {
             ctx.globalAlpha = s.life;
             ctx.translate(s.x, s.y);
             ctx.scale(s.scale + (1 - s.life) * 0.5, s.scale + (1 - s.life) * 0.5);
-            // Glow
-            ctx.shadowColor = 'rgba(100, 255, 100, 0.6)';
-            ctx.shadowBlur = 15 * GLOW_SCALE;
+            // Tanpa glow (outline hitam sudah cukup kontras)
+            ctx.shadowBlur = 0;
             ctx.font = 'bold 20px "Inter", sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#66ff66';
@@ -3156,8 +3354,31 @@ function updateLeaderboard(type = 'local') {
             list.appendChild(div);
         });
     } else {
-        // Global leaderboard placeholder
-        list.innerHTML = '<div class="lb-empty">Leaderboard global akan datang setelah integrasi Firebase penuh.</div>';
+        // Global leaderboard via Firebase (top 50 skor tertinggi semua pemain)
+        list.innerHTML = '<div class="lb-empty">Memuat leaderboard global...</div>';
+        if (typeof loadGlobalLeaderboard === 'function') {
+            loadGlobalLeaderboard(50).then((entries) => {
+                if (!entries.length) {
+                    list.innerHTML = '<div class="lb-empty">Belum ada skor global. Ayo main & bersaing! 🌍</div>';
+                    return;
+                }
+                const myUid = (typeof getAuthUid === 'function') ? getAuthUid() : null;
+                entries.forEach((entry, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'lb-item';
+                    const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+                    const isMe = myUid && entry.uid === myUid;
+                    div.innerHTML = `
+                        <span class="lb-rank ${rankClass}">${index + 1}</span>
+                        <span class="lb-name">${(entry.name || 'Anonim') + (isMe ? ' <span class="lb-you" style="color:#64c8ff;font-weight:600">(kamu)</span>' : '')}</span>
+                        <span class="lb-score">${entry.score}</span>
+                    `;
+                    list.appendChild(div);
+                });
+            });
+        } else {
+            list.innerHTML = '<div class="lb-empty">Firebase tidak tersedia.</div>';
+        }
     }
 }
 
