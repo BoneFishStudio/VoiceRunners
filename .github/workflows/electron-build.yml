@@ -200,7 +200,8 @@ jobs:
             artifacts/VoiceRunner-linux/*.AppImage
           # Explicit: update existing release, bukan bikin baru
           update_existing: true
-          generate_release_notes: true
+          # Jangan generate release notes — body dari release-zip.yml yang dipakai
+          generate_release_notes: false
           # NOTE: sengaja TIDAK pakai fail_on_unmatched_files — kalau salah satu
           # platform gagal, glob platform itu di-skip dan sisanya tetap ter-upload
           # (desain always() partial-upload).
