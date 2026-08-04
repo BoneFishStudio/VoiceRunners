@@ -23,6 +23,9 @@
     },
     "files": [
       "index.html",
+      "favicon.ico",
+      "manifest.json",
+      "sw.js",
       "js/**/*",
       "css/**/*",
       "Music/**/*",
