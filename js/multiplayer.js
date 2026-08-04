@@ -86,6 +86,9 @@ const Multiplayer = {
                 database = firebase.database();
                 fbInitialized = true;
                 console.log('Firebase initialized');
+                // 🔐 Anonymous auth (identitas pemain) — untuk global leaderboard.
+                // Perlu diaktifkan di Firebase Console: Authentication → Sign-in method → Anonymous.
+                initFirebaseAuth();
             } else {
                 console.warn('Firebase SDK not loaded');
             }
@@ -451,6 +454,121 @@ const Multiplayer = {
         this.showMpPanel('create');
     }
 };
+
+// ============================================================
+// 🔐 FIREBASE ANONYMOUS AUTH + GLOBAL LEADERBOARD
+// ============================================================
+// Identitas pemain = auth.uid (anonim). Dipakai sebagai kunci node
+// /leaderboard/{uid} — tiap user cuma bisa menulis ke slot miliknya sendiri
+// (lihat Security Rules: ".write": "auth != null && auth.uid === $uid").
+
+let authUid = null;
+let authReady = false;
+let _pendingGlobalScores = []; // Antrian skor kalau auth belum siap (run pertama tidak hilang)
+
+async function initFirebaseAuth() {
+    if (!fbInitialized) return;
+    try {
+        if (typeof firebase.auth !== 'function') {
+            console.warn('firebase-auth.js tidak dimuat — global leaderboard nonaktif');
+            return;
+        }
+        const current = firebase.auth().currentUser;
+        if (current) {
+            authUid = current.uid;
+            authReady = true;
+        } else {
+            const cred = await firebase.auth().signInAnonymously();
+            authUid = cred.user.uid;
+            authReady = true;
+            console.log('✅ Anonymous auth:', authUid);
+        }
+        // Flush skor yang sempat di-antri sebelum auth siap
+        await flushPendingGlobalScores();
+    } catch(e) {
+        console.warn('Anonymous auth gagal:', e.message);
+    }
+}
+
+async function flushPendingGlobalScores() {
+    while (_pendingGlobalScores.length) {
+        const p = _pendingGlobalScores.shift();
+        try {
+            await saveGlobalLeaderboard(p.name, p.score, p.distance);
+        } catch(e) { /* best-effort */ }
+    }
+}
+
+function getAuthUid() { return authUid; }
+function isAuthReady() { return authReady; }
+
+// Simpan skor terbaik ke /leaderboard/{uid} (best-effort, tidak mengganggu game).
+// Kalau auth/Firebase gagal → return false, skor tetap aman di localStorage.
+async function saveGlobalLeaderboard(name, score, distance) {
+    if (!fbInitialized) { init(); }
+    if (!fbInitialized || !authReady || !authUid || !database) {
+        // Auth belum siap → antri dulu, akan di-flush begitu auth sukses.
+        // Skor lokal tetap tersimpan terlepas dari apa pun.
+        if (fbInitialized) {
+            _pendingGlobalScores.push({ name: name, score: score, distance: distance });
+        }
+        return false;
+    }
+    try {
+        const ref = database.ref('leaderboard/' + authUid);
+        const snap = await ref.once('value');
+        const existing = snap.val();
+        // Simpan yang TERBAIK per user (jangan menimpa skor lebih tinggi)
+        if (existing && typeof existing.score === 'number' && existing.score >= score) {
+            return false;
+        }
+        await ref.set({
+            name: String(name || 'Anonim').slice(0, 20),
+            score: Math.floor(score) || 0,
+            distance: Math.floor(distance) || 0,
+            timestamp: Date.now()
+        });
+        console.log('🌍 Skor global tersimpan:', score);
+        return true;
+    } catch(e) {
+        console.warn('Save global leaderboard gagal:', e.message);
+        return false;
+    }
+}
+
+// Ambil top N skor global dari Firebase (sorted by score desc).
+function loadGlobalLeaderboard(limit) {
+    return new Promise((resolve) => {
+        if (!fbInitialized) { init(); }
+        if (!fbInitialized || !database) { resolve([]); return; }
+        const count = limit || 50;
+        database.ref('leaderboard')
+            .orderByChild('score')
+            .limitToLast(count)
+            .once('value')
+            .then((snap) => {
+                const entries = [];
+                snap.forEach((child) => {
+                    const v = child.val();
+                    if (v && typeof v.score === 'number') {
+                        entries.push({
+                            uid: child.key,
+                            name: v.name,
+                            score: v.score,
+                            distance: v.distance || 0,
+                            timestamp: v.timestamp || 0
+                        });
+                    }
+                });
+                entries.sort((a, b) => b.score - a.score);
+                resolve(entries);
+            })
+            .catch((err) => {
+                console.warn('Load global leaderboard gagal:', err);
+                resolve([]);
+            });
+    });
+}
 
 // ===== UI Functions =====
 
