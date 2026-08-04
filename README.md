@@ -120,7 +120,7 @@ Voice pakai **Web Audio API (AnalyserNode)** — jalan di semua browser modern y
 │   └── 📄 style.css     → Styling
 ├── 📁 Music/             → File musik MP3
 ├── 📁 assets/            → Sprite, ikon PWA & aset
-└── 📁 .github/workflows/ → CI/CD auto-deploy ke Vercel + build Electron
+└── 📁 .github/workflows/ → Build Electron (desktop: .exe/.dmg/.AppImage) → GitHub Release
 ```
 
 ---

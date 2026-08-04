@@ -1,11 +1,9 @@
 # 🖥️ Build Voice Runner Desktop (Electron)
-# Workflow ini TERPISAH dari deploy.yml — hanya trigger saat ada perubahan di
-# electron/ package.json, atau file game yang relevan.
-# Hasil build (.exe, .dmg, .AppImage) di-upload ke GitHub Release yang SAMA
-# dengan release ZIP Itch.io dari deploy.yml.
+# Deploy web TIDAK lewat CI/CD lagi — Vercel native Git Integration yang handle
+# (connect repo di dashboard Vercel → auto-deploy ke voicerunners.vercel.app).
 #
-# Jika release belum ada (misal trigger manual tanpa deploy.yml dulu),
-# workflow ini akan membuat release baru secara otomatis.
+# Workflow ini hanya untuk build desktop (.exe/.dmg/.AppImage) dan upload ke
+# GitHub Release. Jika release belum ada, workflow ini membuatnya otomatis.
 
 name: 🖥️ Build Voice Runner Desktop (Electron)
 
@@ -21,10 +19,7 @@ on:
       - 'css/**'
       - 'assets/**'
       - 'Music/**'
-      # Perubahan workflow juga harus memicu build — deploy.yml bikin release+ZIP
-      # di SETIAP push tanpa filter paths, jadi kalau commit cuma mengubah
-      # .github/workflows/** dan electron-build tidak ikut jalan, release terbaru
-      # hanya berisi ZIP tanpa .exe/.dmg/.AppImage.
+      # Perubahan workflow juga harus memicu build (misal edit workflow ini sendiri).
       - '.github/workflows/**'
   workflow_dispatch:
 
@@ -194,22 +189,18 @@ jobs:
       - name: 📦 Upload artifacts ke GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # softprops bikin tag+release otomatis kalau belum ada, dan meng-update
-          # kalau sudah ada — jadi race dengan deploy.yml (yang juga bikin tag
-          # versi yang sama) tidak akan error lagi.
+          # softprops bikin tag+release otomatis kalau belum ada.
           tag_name: ${{ needs.prepare.outputs.version }}
           # Tag harus menunjuk commit build yang presisi (bukan default-branch HEAD)
           target_commitish: ${{ github.sha }}
-          # JANGAN set body — biar body dari deploy.yml tidak tertimpa.
-          # Kita cuma upload files ke release yang sama.
+          # Kita cuma upload files ke release.
           files: |
             artifacts/VoiceRunner-windows/*.exe
             artifacts/VoiceRunner-macos/*.dmg
             artifacts/VoiceRunner-linux/*.AppImage
           # Explicit: update existing release, bukan bikin baru
           update_existing: true
-          # Jangan generate release notes (nanti timpa yang dari deploy)
-          generate_release_notes: false
+          generate_release_notes: true
           # NOTE: sengaja TIDAK pakai fail_on_unmatched_files — kalau salah satu
           # platform gagal, glob platform itu di-skip dan sisanya tetap ter-upload
           # (desain always() partial-upload).
