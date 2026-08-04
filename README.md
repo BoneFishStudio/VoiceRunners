@@ -140,62 +140,17 @@ Voice pakai **Web Audio API (AnalyserNode)** — jalan di semua browser modern y
 
 ---
 
-## 🔒 FIREBASE SECURITY RULES (WAJIB APPLY MANUAL)
+## 🔒 FIREBASE SETUP (MANUAL DI CONSOLE — SEKALI SAJA)
 
-Apply di **Firebase Console → Realtime Database → Rules** (gabungkan dengan rules rooms yang sudah ada):
+> ⚠️ **Tidak ada secret/config Firebase di repo ini.** Rules lengkap disimpan di [`docs/firebase-rules.json`](docs/firebase-rules.json).
 
-```json
-{
-  "rules": {
-    "rooms": {
-      ".read": true,
-      "$room_id": {
-        ".read": true,
-        ".write": "!data.exists() || (data.child('status').val() === 'waiting')",
-        "players": {
-          "$player_id": {
-            ".validate": "newData.hasChildren(['id', 'name', 'score', 'distance', 'lives', 'alive', 'ready', 'joinedAt'])",
-            "id": { ".validate": "newData.isString()" },
-            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
-            "score": { ".validate": "newData.isNumber()" },
-            "distance": { ".validate": "newData.isNumber()" },
-            "lives": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
-            "alive": { ".validate": "newData.isBoolean()" },
-            "ready": { ".validate": "newData.isBoolean()" },
-            "joinedAt": { ".validate": "newData.isNumber()" }
-          }
-        },
-        "playerOrder": { ".validate": "newData.isArray()" },
-        "host": { ".validate": "newData.isString()" },
-        "status": { ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'playing')" },
-        "seed": { ".validate": "newData.isNumber()" },
-        "maxPlayers": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 4" },
-        "password": {
-          ".write": "!data.exists()",
-          ".validate": "newData.isString() && newData.val().length <= 64"
-        },
-        "createdAt": { ".validate": "newData.isNumber()" },
-        "startTime": { ".validate": "newData.isNumber()" }
-      }
-    },
-    "leaderboard": {
-      ".read": true,
-      "$uid": {
-        ".write": "auth != null && auth.uid === $uid",
-        "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
-        "score": { ".validate": "newData.isNumber()" },
-        "distance": { ".validate": "newData.isNumber()" },
-        "timestamp": { ".validate": "newData.isNumber()" }
-      }
-    }
-  }
-}
-```
+Lakukan ini di **Firebase Console → project `server-ba906`**:
 
-**Setup yang perlu dilakukan manual di Firebase Console:**
-1. **Authentication → Sign-in method → Anonymous** → aktifkan ✅
-2. **Realtime Database → Rules** → paste rules di atas
-3. **Realtime Database → Rules** — pastikan field `gameState` tetap divalidasi seperti rules yang kamu pakai sebelumnya (contoh di atas versi ringkas; sesuaikan dengan node ekstra yang ada di data-mu)
+1. **Authentication → Sign-in method → Anonymous** → **Aktifkan** ✅
+2. **Realtime Database → Rules** → paste isi `docs/firebase-rules.json` (gabung dengan rules rooms yang sudah ada)
+3. **Realtime Database → Rules** — pastikan field `gameState` tetap divalidasi seperti rules yang kamu pakai sebelumnya
+
+> Catatan: `firebaseConfig` (apiKey, dsb.) hanya ada di `js/multiplayer.js` — wajib ada di client dan **bukan rahasia** (keamanan diatur oleh Security Rules + Auth, bukan menyembunyikan apiKey).
 
 ---
 

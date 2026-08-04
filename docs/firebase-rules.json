@@ -1,0 +1,53 @@
+{
+  "rules": {
+    "rooms": {
+      ".read": true,
+      "$room_id": {
+        ".read": true,
+        ".write": "!data.exists() || (data.child('status').val() === 'waiting')",
+        "players": {
+          "$player_id": {
+            ".validate": "newData.hasChildren(['id', 'name', 'score', 'distance', 'lives', 'alive', 'ready', 'joinedAt'])",
+            "id": { ".validate": "newData.isString()" },
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "score": { ".validate": "newData.isNumber()" },
+            "distance": { ".validate": "newData.isNumber()" },
+            "lives": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+            "alive": { ".validate": "newData.isBoolean()" },
+            "ready": { ".validate": "newData.isBoolean()" },
+            "joinedAt": { ".validate": "newData.isNumber()" }
+          }
+        },
+        "playerOrder": { ".validate": "newData.isObject()" },
+        "host": { ".validate": "newData.isString()" },
+        "status": { ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'playing')" },
+        "seed": { ".validate": "newData.isNumber()" },
+        "maxPlayers": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 4" },
+        "password": {
+          ".write": "!data.exists()",
+          ".validate": "newData.isString() && newData.val().length <= 64"
+        },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "startTime": { ".validate": "newData.isNumber()" },
+        "gameState": {
+          "started": { ".validate": "newData.isBoolean()" },
+          "seed": { ".validate": "newData.isNumber()" },
+          "timestamp": { ".validate": "newData.isNumber()" },
+          "finished": { ".validate": "newData.isBoolean()" },
+          "finishTime": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+    "leaderboard": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "score": { ".validate": "newData.isNumber()" },
+        "distance": { ".validate": "newData.isNumber()" },
+        "timestamp": { ".validate": "newData.isNumber()" }
+      }
+    }
+  }
+}
