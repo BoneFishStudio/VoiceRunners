@@ -62,8 +62,9 @@ jobs:
     needs: lint
     permissions:
       contents: write    # Diperlukan untuk push tag + buat release
-    # Hanya deploy dari push ke main/master, bukan dari PR
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    # Deploy dari push ATAU manual (workflow_dispatch) di main/master, bukan dari PR.
+    # FIX: sebelumnya workflow_dispatch di-skip → tombol "Run workflow" tidak deploy.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
@@ -103,14 +104,19 @@ jobs:
       - name: 🌍 Get Deployment URL
         id: deploy_url
         run: |
+          # FIX: ambil URL PRODUCTION STABIL, bukan deployment URL acak pertama.
+          # Sebelumnya head -1 menangkap 'https://voicerunners-<hash>-...vercel.app'
+          # (URL per-deployment yang SSO-protected) → link "Play Online" di release
+          # selalu salah. Sekarang pakai URL terakhir dari output deploy
+          # (baris "Production:"), fallback ke domain stabil.
+          URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' deploy-output.txt | tail -1 || true)
+          if [ -z "$URL" ]; then
+            URL="https://voicerunners.vercel.app"
+          fi
           echo "### ✅ Deployed to Vercel! 🎉" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Deployment URL:" >> $GITHUB_STEP_SUMMARY
-          grep -o 'https://[^ ]*\.vercel\.app' deploy-output.txt | head -1 | \
-            while read url; do
-              echo "- **Production**: [$url]($url)" >> $GITHUB_STEP_SUMMARY
-              echo "url=$url" >> $GITHUB_OUTPUT
-            done || echo "- Check Vercel dashboard for URL" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment URL: $URL" >> $GITHUB_STEP_SUMMARY
+          echo "url=$URL" >> $GITHUB_OUTPUT
 
       - name: 🏷️ Buat Git Tag & Release
         if: success()
