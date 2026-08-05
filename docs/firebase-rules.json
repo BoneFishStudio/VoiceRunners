@@ -39,14 +39,26 @@
         }
       }
     },
+
+    "userRoles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "root.child('userRoles').child(auth.uid).val() === 'admin'",
+        ".validate": "newData.isString() && (newData.val() === 'admin' || newData.val() === 'moderator' || newData.val() === 'user' || newData.val() === 'anon')"
+      }
+    },
+
     "leaderboard": {
       ".read": true,
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).val() === 'admin' || root.child('userRoles').child(auth.uid).val() === 'moderator' || (auth.uid === $uid && (!data.exists() || !data.hasChild('lastSubmitTimestamp') || (newData.hasChild('lastSubmitTimestamp') && newData.child('lastSubmitTimestamp').val() > data.child('lastSubmitTimestamp').val() + 5000))))",
         "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
-        "score": { ".validate": "newData.isNumber()" },
-        "distance": { ".validate": "newData.isNumber()" },
-        "timestamp": { ".validate": "newData.isNumber()" }
+        "score": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= (newData.parent().child('distance').val() * 3 + 8000)" },
+        "distance": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "timestamp": { ".validate": "newData.isNumber()" },
+        "lastSubmitTimestamp": { ".validate": "newData.isNumber()" },
+        "isGuest": { ".validate": "newData.isBoolean()" },
+        "$other": { ".validate": false }
       }
     }
   }
