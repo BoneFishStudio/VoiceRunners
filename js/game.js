@@ -3323,11 +3323,24 @@ function hideLeaderboard() {
     document.getElementById('mainMenu').classList.add('active');
 }
 
+// Heuristik anti-cheat (tampilan saja, utk ditinjau moderator):
+// skor normal maksimal ±3x jarak; di atas itu ditandai ⚠️ perlu review.
+function isSuspiciousScore(entry) {
+    const d = entry.distance || 0;
+    if (d <= 0 && (entry.score || 0) > 100) return true;
+    // Skor legit maksimal ±3x jarak (formula distance*2 + frameCount*0.5).
+    // Ambang 3.5x dipakai biar run legit ekstrem tidak kena false-positive.
+    return (entry.score || 0) > d * 3.5 + 5000;
+}
+
 function updateLeaderboard(type = 'local') {
     const list = document.getElementById('leaderboardList');
+    const note = document.getElementById('lbNote');
     list.innerHTML = '';
     
     if (type === 'local') {
+        // Tab LOKAL = rekor perangkat ini saja (localStorage), tidak terhubung server
+        if (note) note.textContent = 'Skor tersimpan di perangkat ini saja.';
         let leaderboard = [];
         const saved = localStorage.getItem('voiceRunner_leaderboard');
         if (saved) {
@@ -3348,13 +3361,15 @@ function updateLeaderboard(type = 'local') {
             const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
             div.innerHTML = `
                 <span class="lb-rank ${rankClass}">${index + 1}</span>
-                <span class="lb-name">${entry.name || 'Anonim'}</span>
+                <span class="lb-name">${escapeHtml(entry.name || 'Anonim')}</span>
                 <span class="lb-score">${entry.score}</span>
             `;
             list.appendChild(div);
         });
     } else {
-        // Global leaderboard via Firebase (top 50 skor tertinggi semua pemain)
+        // Tab GLOBAL = Firebase /leaderboard — top 50 semua pemain semua device
+        if (note) note.textContent = 'Skor tersimpan di server — semua pemain, semua device. 🌍';
+        const canMod = (typeof isCurrentUserMod === 'function') ? isCurrentUserMod() : false;
         list.innerHTML = '<div class="lb-empty">Memuat leaderboard global...</div>';
         if (typeof loadGlobalLeaderboard === 'function') {
             loadGlobalLeaderboard(50).then((entries) => {
@@ -3368,10 +3383,16 @@ function updateLeaderboard(type = 'local') {
                     div.className = 'lb-item';
                     const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
                     const isMe = myUid && entry.uid === myUid;
+                    const guest = entry.isGuest ? ' <span class="lb-guest" title="Akun anonim">👤 Guest</span>' : '';
+                    const flag = isSuspiciousScore(entry)
+                        ? ' <span class="lb-flag" title="Skor mencurigakan — perlu review moderator">⚠️</span>' : '';
+                    const del = canMod
+                        ? ` <button class="lb-del" onclick="deleteGlobalEntry('${entry.uid}')" title="Hapus entry (moderasi)">🗑</button>` : '';
                     div.innerHTML = `
                         <span class="lb-rank ${rankClass}">${index + 1}</span>
-                        <span class="lb-name">${(entry.name || 'Anonim') + (isMe ? ' <span class="lb-you" style="color:#64c8ff;font-weight:600">(kamu)</span>' : '')}</span>
+                        <span class="lb-name">${escapeHtml(entry.name || 'Anonim')}${guest}${flag}${isMe ? ' <span class="lb-you">(kamu)</span>' : ''}</span>
                         <span class="lb-score">${entry.score}</span>
+                        ${del ? `<span class="lb-del-wrap">${del}</span>` : ''}
                     `;
                     list.appendChild(div);
                 });
@@ -3406,6 +3427,9 @@ function showSettings() {
     const sens = AudioManager.getMicSensitivity();
     document.getElementById('micSensitivity').value = sens;
     document.getElementById('micSensValue').textContent = Math.round(sens * 100) + '%';
+    
+    // Refresh status akun (Guest/user) + section moderasi
+    if (typeof refreshAccountUI === 'function') refreshAccountUI();
 }
 
 function hideSettings() {

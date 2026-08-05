@@ -290,6 +290,7 @@
                 <button class="lb-tab active" onclick="switchLbTab('local')" id="lbTabLocal">LOKAL</button>
                 <button class="lb-tab" onclick="switchLbTab('global')" id="lbTabGlobal">GLOBAL</button>
             </div>
+            <p class="lb-note" id="lbNote">Skor tersimpan di perangkat ini saja.</p>
             <div class="lb-list" id="leaderboardList">
                 <div class="lb-empty">Belum ada skor. Ayo main!</div>
             </div>
@@ -338,6 +339,47 @@
                 </div>
                 <button class="danger-btn" onclick="resetAllData()">RESET</button>
             </div>
+
+            <!-- ===== AKUN (Guest ↔ permanen) ===== -->
+            <div class="setting-section">
+                <h3 class="setting-section-title">👤 AKUN</h3>
+                <div class="account-status" id="accountStatus">Menghubungkan...</div>
+                <div id="accountGuestBox" class="account-box" style="display:none;">
+                    <p class="setting-desc">Kamu bermain sebagai <b>Guest (anonim)</b>. Skor otomatis masuk ke leaderboard, tapi kalau data browser dihapus, akun Guest hilang. Daftar akun permanen untuk menyimpan skor di server & login dari device lain tanpa kehilangan progress.</p>
+                    <div class="account-form">
+                        <input type="text" id="accName" placeholder="Nama tampilan (maks 20)" maxlength="20">
+                        <input type="email" id="accEmail" placeholder="Email" maxlength="64">
+                        <input type="password" id="accPassword" placeholder="Password (min 6 karakter)" maxlength="64">
+                        <button class="menu-btn primary" onclick="upgradeAccount()"><span class="btn-icon">🔁</span> UPGRADE KE AKUN PERMANEN</button>
+                        <button class="menu-btn" onclick="loginAccount()"><span class="btn-icon">🔑</span> MASUK AKUN</button>
+                    </div>
+                    <div id="accountMsg" class="mp-status" style="display:none;"></div>
+                </div>
+                <div id="accountUserBox" class="account-box" style="display:none;">
+                    <p id="accountUserInfo" class="setting-desc"></p>
+                    <button class="menu-btn" onclick="logoutAccount()"><span class="btn-icon">🚪</span> KELUAR</button>
+                </div>
+            </div>
+
+            <!-- ===== MODERASI (hanya tampil utk admin/moderator) ===== -->
+            <div id="moderationSection" class="setting-section" style="display:none;">
+                <h3 class="setting-section-title">🛡️ MODERASI</h3>
+                <div id="adminRoleBox" style="display:none;">
+                    <p class="setting-desc">Atur role user (khusus Admin):</p>
+                    <div class="account-form">
+                        <input type="text" id="modUid" placeholder="UID user (dari Firebase Auth)" maxlength="64">
+                        <select id="modRoleSelect">
+                            <option value="user">user</option>
+                            <option value="moderator">moderator</option>
+                            <option value="anon">anon</option>
+                        </select>
+                        <button class="menu-btn primary" onclick="applyRole()"><span class="btn-icon">✅</span> TERAPKAN ROLE</button>
+                    </div>
+                    <div id="modMsg" class="mp-status" style="display:none;"></div>
+                </div>
+                <p class="setting-desc">🗑 Hapus skor mencurigakan lewat tab <b>GLOBAL</b> di leaderboard (tombol 🗑 muncul di tiap entry).</p>
+            </div>
+
             <button class="back-btn" onclick="hideSettings()">← KEMBALI</button>
         </div>
     </div>

@@ -1564,3 +1564,128 @@ html, body {
 body::-webkit-scrollbar {
     width: 0;
 }
+
+/* ===== LEADERBOARD: NOTE + BADGE GUEST + FLAG + TOMBOL HAPUS ===== */
+.lb-note {
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    margin: -0.8rem 0 1rem 0;
+    opacity: 0.85;
+}
+
+.lb-you {
+    color: #64c8ff;
+    font-weight: 600;
+}
+
+.lb-guest {
+    display: inline-block;
+    background: rgba(255,170,0,0.15);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    border-radius: 3px;
+    font-size: 0.62rem;
+    padding: 0.1rem 0.35rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    font-weight: 600;
+}
+
+.lb-flag {
+    cursor: help;
+    margin-left: 0.3rem;
+}
+
+.lb-del-wrap {
+    display: flex;
+    align-items: center;
+}
+
+.lb-del {
+    background: rgba(255,68,68,0.15);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.lb-del:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
+/* ===== SETTINGS: AKUN & MODERASI ===== */
+.setting-section {
+    margin-top: 1.5rem;
+    padding-top: 1.2rem;
+    border-top: 2px solid var(--surface2);
+    text-align: left;
+}
+
+.setting-section-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+}
+
+.account-status {
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    background: var(--surface);
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+}
+
+.account-box {
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    margin-bottom: 0.8rem;
+}
+
+.account-form input,
+.account-form select {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    margin-bottom: 0.6rem;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+.account-form input:focus,
+.account-form select:focus {
+    border-color: var(--text);
+}
+
+.account-form select option {
+    background: var(--surface);
+    color: var(--text);
+}
+
+.account-form .menu-btn {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 0.6rem;
+}
+
+.account-box .setting-desc {
+    margin-bottom: 0.8rem;
+}
+
+#accountUserBox .menu-btn {
+    width: 100%;
+    justify-content: center;
+}
