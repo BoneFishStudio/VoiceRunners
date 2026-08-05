@@ -295,9 +295,11 @@ const Multiplayer = {
             const div = document.createElement('div');
             div.className = 'mp-player';
             div.innerHTML = `
-                <span class="player-icon">${pid === data.host ? '👑' : '👤'}</span>
+                <span class="player-icon">${pid === data.host
+                    ? '<svg class="lb-icon"><use href="#icon-trophy"/></svg>'
+                    : '<svg class="lb-icon"><use href="#icon-user"/></svg>'}</span>
                 <span class="player-name">${p.name || 'Pemain'}</span>
-                <span class="player-status">${p.ready ? '✅ Siap' : '⏳...'}</span>
+                <span class="player-status">${p.ready ? 'Siap' : '...'}</span>
             `;
             playerList.appendChild(div);
         });
@@ -746,41 +748,133 @@ async function deleteGlobalEntry(uid) {
     }
 }
 
-// ===== UI SETTINGS: AKUN & MODERASI =====
+// ===== UI PROFILE: kartu profil + status akun =====
 
-// Refresh status akun + visibilitas section moderasi di Settings.
+// Statistik pribadi dari localStorage (best score, jarak terjauh, jumlah game)
+function getProfileStats() {
+    let bestScore = 0, bestDist = 0, games = 0;
+    try {
+        const saved = localStorage.getItem('voiceRunner_leaderboard');
+        if (saved) {
+            const lb = JSON.parse(saved);
+            lb.filter(e => e.type !== 'checkpoint').forEach(e => {
+                games++;
+                if (e.score > bestScore) bestScore = e.score;
+                if (e.distance > bestDist) bestDist = e.distance;
+            });
+        }
+    } catch(e) {}
+    return { bestScore, bestDist, games };
+}
+
+// Refresh kartu profil + status akun (dipakai di halaman PROFILE).
 function refreshAccountUI() {
-    const status = document.getElementById('accountStatus');
-    if (!status) return;
-    const guestBox = document.getElementById('accountGuestBox');
-    const userBox = document.getElementById('accountUserBox');
-    const modSection = document.getElementById('moderationSection');
+    const nameEl = document.getElementById('profileName');
+    const emailEl = document.getElementById('profileEmail');
+    const badgeEl = document.getElementById('profileBadge');
+    const avatarEl = document.getElementById('profileAvatar');
+    const status = document.getElementById('authStatus');
     const role = getUserRole();
 
+    // Statistik selalu diisi dari localStorage
+    const st = getProfileStats();
+    const bsEl = document.getElementById('profileBestScore');
+    const bdEl = document.getElementById('profileBestDist');
+    const gmEl = document.getElementById('profileGames');
+    if (bsEl) bsEl.textContent = st.bestScore;
+    if (bdEl) bdEl.textContent = Math.floor(st.bestDist) + 'm';
+    if (gmEl) gmEl.textContent = st.games;
+
+    const badgeLabel = role === 'admin' ? 'ADMIN' : role === 'moderator' ? 'MODERATOR' : role === 'user' ? 'MEMBER' : 'GUEST';
+    const badgeColor = role === 'admin' ? 'admin' : role === 'moderator' ? 'moderator' : role === 'user' ? 'member' : 'guest';
+
     if (!authUser) {
-        status.innerHTML = '⏳ Menghubungkan... (sign-in otomatis)';
-        if (guestBox) guestBox.style.display = 'none';
-        if (userBox) userBox.style.display = 'none';
+        if (nameEl) nameEl.textContent = 'Menghubungkan...';
+        if (emailEl) emailEl.textContent = '';
+        if (status) status.textContent = '⏳ Menghubungkan... (sign-in otomatis)';
     } else if (authUser.isAnonymous) {
-        status.innerHTML = '🎭 <b>Guest (anonim)</b> — role: <b>' + escapeHtml(role) + '</b>';
-        if (guestBox) guestBox.style.display = 'block';
-        if (userBox) userBox.style.display = 'none';
+        if (nameEl) nameEl.textContent = 'Guest';
+        if (emailEl) emailEl.textContent = 'Skor tersimpan di perangkat ini';
+        if (status) status.textContent = 'Kamu bermain sebagai Guest. Daftar untuk menyimpan skor di server.';
     } else {
         const label = authUser.displayName || authUser.email || 'Akun';
-        status.innerHTML = '👤 <b>' + escapeHtml(label) + '</b> — role: <b>' + escapeHtml(role) + '</b>';
-        if (guestBox) guestBox.style.display = 'none';
-        if (userBox) {
-            userBox.style.display = 'block';
-            const info = document.getElementById('accountUserInfo');
-            if (info) info.textContent = 'Masuk sebagai ' + (authUser.email || label);
+        if (nameEl) nameEl.textContent = label;
+        if (emailEl) emailEl.textContent = authUser.email || '';
+        if (status) status.textContent = 'Kamu masuk sebagai akun permanen. Skor tersinkron antar device.';
+    }
+    if (badgeEl) {
+        badgeEl.textContent = badgeLabel;
+        badgeEl.className = 'profile-badge ' + badgeColor;
+    }
+    if (avatarEl) {
+        // Avatar: inisial nama (atau huruf G untuk Guest)
+        let initial = '?';
+        if (authUser && !authUser.isAnonymous) {
+            const label = (authUser.displayName || authUser.email || 'U').trim();
+            initial = label.charAt(0).toUpperCase();
+        } else if (authUser && authUser.isAnonymous) {
+            initial = 'G';
         }
+        avatarEl.textContent = initial;
+        avatarEl.classList.add('has-initial');
     }
 
+    // Moderasi: tampil hanya utk admin/moderator; panel set-role khusus admin
+    const modSection = document.getElementById('moderationSection');
     if (modSection) {
         modSection.style.display = (role === 'admin' || role === 'moderator') ? 'block' : 'none';
         const adminRoleBox = document.getElementById('adminRoleBox');
         if (adminRoleBox) adminRoleBox.style.display = (role === 'admin') ? 'block' : 'none';
     }
+
+    // Pastikan panel logged-in ikut refresh (dipakai dari onAuthStateChanged,
+    // logoutAccount, dan showAuth — jadi UI tidak pernah nyangkut)
+    if (typeof updateProfileLoggedInPanel === 'function') updateProfileLoggedInPanel();
+}
+
+// Update halaman PROFILE: kalau sudah login permanen, sembunyikan form login/daftar,
+// tampilkan panel "KELUAR" (reset password + logout).
+function updateProfileLoggedInPanel() {
+    const loggedInPanel = document.getElementById('authPanelLoggedIn');
+    const tabs = document.querySelector('.auth-tabs');
+    if (!loggedInPanel) return;
+    const isPermanent = authUser && !authUser.isAnonymous;
+    if (isPermanent) {
+        // Sembunyikan SEMUA panel auth (login/daftar/lupa password) — bukan cuma tabs,
+        // karena panel-panel itu sibling dari tabs, bukan child.
+        ['authPanelLogin', 'authPanelRegister', 'authPanelForgot'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        loggedInPanel.style.display = 'block';
+        if (tabs) tabs.style.display = 'none';
+        const info = document.getElementById('authLoggedInInfo');
+        if (info) info.textContent = 'Masuk sebagai ' + (authUser.email || authUser.displayName || 'akun');
+    } else {
+        loggedInPanel.style.display = 'none';
+        if (tabs) tabs.style.display = 'flex';
+        const active = document.querySelector('.auth-tab.active');
+        const tab = active && active.id === 'authTabRegister' ? 'register' : 'login';
+        const panelId = tab === 'register' ? 'authPanelRegister' : 'authPanelLogin';
+        const el = document.getElementById(panelId);
+        if (el) el.style.display = 'block';
+    }
+}
+
+// Refresh status di halaman PROFILE + panel logged-in
+function refreshAuthStatus() {
+    const el = document.getElementById('authStatus');
+    if (!el) return;
+    if (!authUser) {
+        el.textContent = '⏳ Menghubungkan...';
+    } else if (authUser.isAnonymous) {
+        el.textContent = 'Kamu masuk sebagai Guest. Daftar untuk menyimpan skor permanen di server.';
+    } else {
+        const label = authUser.displayName || authUser.email || 'Akun';
+        el.textContent = 'Masuk sebagai ' + label + ' — akun permanen ✓';
+    }
+    if (typeof updateProfileLoggedInPanel === 'function') updateProfileLoggedInPanel();
+    if (typeof refreshAccountUI === 'function') refreshAccountUI();
 }
 
 // ============================================================
@@ -807,20 +901,8 @@ function switchAuthTab(tab) {
     document.getElementById('authPanelLogin').style.display = tab === 'login' ? 'block' : 'none';
     document.getElementById('authPanelRegister').style.display = tab === 'register' ? 'block' : 'none';
     document.getElementById('authPanelForgot').style.display = tab === 'forgot' ? 'block' : 'none';
+    if (typeof updateProfileLoggedInPanel === 'function') updateProfileLoggedInPanel();
     if (typeof refreshAuthStatus === 'function') refreshAuthStatus();
-}
-
-function refreshAuthStatus() {
-    const el = document.getElementById('authStatus');
-    if (!el) return;
-    if (!authUser) {
-        el.innerHTML = '⏳ Menghubungkan...';
-    } else if (authUser.isAnonymous) {
-        el.innerHTML = '🎭 Kamu masuk sebagai <b>Guest (anonim)</b>. Daftar akun untuk menyimpan skor permanen di server.';
-    } else {
-        const label = authUser.displayName || authUser.email || 'Akun';
-        el.innerHTML = '👤 <b>' + escapeHtml(label) + '</b> — <span class="auth-ok">akun permanen</span> ✓';
-    }
 }
 
 function isValidEmail(email) {

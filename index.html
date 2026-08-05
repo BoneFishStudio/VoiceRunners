@@ -34,6 +34,40 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- SVG ICON SPRITE (proper icons, bukan emoji) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <symbol id="icon-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+        <symbol id="icon-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+        <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+        <symbol id="icon-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+        <symbol id="icon-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="icon-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+        <symbol id="icon-rocket" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></symbol>
+        <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+        <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>
+        <symbol id="icon-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+        <symbol id="icon-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+        <symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+        <symbol id="icon-skull" viewBox="0 0 24 24"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M12 2a8 8 0 0 0-8 8c0 2.5 1.2 4.5 3 5.8V20a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-4.2c1.8-1.3 3-3.3 3-5.8a8 8 0 0 0-8-8z"/><path d="M9 21v-2h6v2"/></symbol>
+        <symbol id="icon-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+        <symbol id="icon-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+        <symbol id="icon-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+        <symbol id="icon-mail" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></symbol>
+        <symbol id="icon-mic" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></symbol>
+        <symbol id="icon-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
+        <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+        <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+        <symbol id="icon-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+        <symbol id="icon-map-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+        <symbol id="icon-chevron-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+        <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></symbol>
+        <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+        <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    </svg>
+
     <!-- Canvas untuk gameplay -->
     <canvas id="gameCanvas"></canvas>
 
@@ -52,23 +86,23 @@
                     <div class="menu-spacer"></div>
                     <div class="menu-buttons">
                         <button class="menu-btn primary" onclick="startGame()">
-                            <span class="btn-icon">▶</span> START
+                            <svg class="btn-icon"><use href="#icon-play"/></svg> START
                         </button>
                         <button class="menu-btn" onclick="showLeaderboard()">
-                            <span class="btn-icon">🏆</span> LEADERBOARD
+                            <svg class="btn-icon"><use href="#icon-trophy"/></svg> LEADERBOARD
                         </button>
                         <button class="menu-btn" onclick="showSettings()">
-                            <span class="btn-icon">⚙</span> SETTINGS
+                            <svg class="btn-icon"><use href="#icon-settings"/></svg> SETTINGS
                         </button>
                         <button class="menu-btn" onclick="showAuth('login')">
-                            <span class="btn-icon">👤</span> AKUN
+                            <svg class="btn-icon"><use href="#icon-user"/></svg> PROFILE
                         </button>
                         <button class="menu-btn exit" onclick="exitGame()">
-                            <span class="btn-icon">✕</span> EXIT
+                            <svg class="btn-icon"><use href="#icon-x"/></svg> EXIT
                         </button>
                     </div>
                     <div class="menu-footer">
-                        <p>🎤 Bersuara untuk lompat — TERIAK keras untuk mengisi lubang!</p>
+                        <p><svg class="mini-icon"><use href="#icon-mic"/></svg> Bersuara untuk lompat — TERIAK keras untuk mengisi lubang!</p>
                     </div>
                 </div>
             </div>
@@ -77,15 +111,15 @@
                 <div class="menu-right-overlay">
                     <div class="menu-features">
                         <div class="feature-item">
-                            <span class="feature-icon">🏃</span>
+                            <svg class="feature-icon"><use href="#icon-zap"/></svg>
                             <span class="feature-text">Endless Runner</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon">🎤</span>
+                            <svg class="feature-icon"><use href="#icon-mic"/></svg>
                             <span class="feature-text">Voice Challenge</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon">👥</span>
+                            <svg class="feature-icon"><use href="#icon-users"/></svg>
                             <span class="feature-text">Multiplayer 4P</span>
                         </div>
                     </div>
@@ -102,23 +136,23 @@
             </div>
             <div class="menu-buttons">
                 <button class="menu-btn primary" onclick="startGame()">
-                    <span class="btn-icon">▶</span> START
+                    <svg class="btn-icon"><use href="#icon-play"/></svg> START
                 </button>
                 <button class="menu-btn" onclick="showLeaderboard()">
-                    <span class="btn-icon">🏆</span> LEADERBOARD
+                    <svg class="btn-icon"><use href="#icon-trophy"/></svg> LEADERBOARD
                 </button>
                 <button class="menu-btn" onclick="showSettings()">
-                    <span class="btn-icon">⚙</span> SETTINGS
+                    <svg class="btn-icon"><use href="#icon-settings"/></svg> SETTINGS
                 </button>
                 <button class="menu-btn" onclick="showAuth('login')">
-                    <span class="btn-icon">👤</span> AKUN
+                    <svg class="btn-icon"><use href="#icon-user"/></svg> PROFILE
                 </button>
                 <button class="menu-btn exit" onclick="exitGame()">
-                    <span class="btn-icon">✕</span> EXIT
+                    <svg class="btn-icon"><use href="#icon-x"/></svg> EXIT
                 </button>
             </div>
             <div class="menu-footer">
-                <p>🎤 Gunakan suaramu untuk mengisi lubang!</p>
+                <p><svg class="mini-icon"><use href="#icon-mic"/></svg> Gunakan suaramu untuk mengisi lubang!</p>
             </div>
         </div>
     </div>
@@ -143,17 +177,17 @@
             <h2>PILIH MODE</h2>
             <div class="mode-buttons">
                 <button class="mode-btn solo" onclick="startSolo()">
-                    <span class="mode-icon">👤</span>
+                    <svg class="mode-icon"><use href="#icon-user"/></svg>
                     <span class="mode-title">SOLO</span>
                     <span class="mode-desc">Main sendirian</span>
                 </button>
                 <button class="mode-btn multiplayer" onclick="showMultiplayer()">
-                    <span class="mode-icon">👥</span>
+                    <svg class="mode-icon"><use href="#icon-users"/></svg>
                     <span class="mode-title">MULTIPLAYER</span>
                     <span class="mode-desc">4 pemain online</span>
                 </button>
             </div>
-            <button class="back-btn" onclick="showMainMenu()">← KEMBALI</button>
+            <button class="back-btn" onclick="showMainMenu()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> KEMBALI</button>
         </div>
     </div>
 
@@ -177,7 +211,7 @@
                     <input type="password" id="roomPassword" placeholder="Kosongkan jika tanpa password" maxlength="20">
                 </div>
                 <button class="menu-btn primary" onclick="createRoom()">
-                    <span class="btn-icon">🚀</span> BUAT ROOM
+                    <svg class="btn-icon"><use href="#icon-rocket"/></svg> BUAT ROOM
                 </button>
                 <div id="roomStatus" class="mp-status"></div>
             </div>
@@ -193,7 +227,7 @@
                     <input type="password" id="joinPassword" placeholder="Password room (jika ada)" maxlength="20">
                 </div>
                 <button class="menu-btn primary" onclick="joinRoom()">
-                    <span class="btn-icon">🔗</span> GABUNG
+                    <svg class="btn-icon"><use href="#icon-link"/></svg> GABUNG
                 </button>
                 <div id="joinStatus" class="mp-status"></div>
             </div>
@@ -206,12 +240,12 @@
                 <p class="mp-hint">Bagikan kode ini ke temanmu!</p>
                 <div class="mp-players-count" id="playersCount">1/4 pemain</div>
                 <button class="menu-btn primary" id="startMultiBtn" onclick="startMultiplayerGame()" style="display:none;">
-                    <span class="btn-icon">▶</span> MULAI (2+ pemain)
+                    <svg class="btn-icon"><use href="#icon-play"/></svg> MULAI (2+ pemain)
                 </button>
-                <button class="back-btn" onclick="leaveRoom()">← BATAL</button>
+                <button class="back-btn" onclick="leaveRoom()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> BATAL</button>
             </div>
 
-            <button class="back-btn" onclick="showModeSelect()">← KEMBALI</button>
+            <button class="back-btn" onclick="showModeSelect()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> KEMBALI</button>
         </div>
     </div>
 
@@ -219,7 +253,7 @@
     <div id="gameOverlay">
         <div id="hud">
             <div class="hud-left">
-                <div class="hud-lives" id="livesDisplay">❤️❤️❤️</div>
+                <div class="hud-lives" id="livesDisplay"><svg class="life-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-heart"/></svg><svg class="life-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-heart"/></svg><svg class="life-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-heart"/></svg></div>
                 <div class="hud-score" id="scoreDisplay">Skor: 0</div>
             </div>
             <div class="hud-center">
@@ -228,13 +262,13 @@
                     <div class="volume-bar-bg">
                         <div class="volume-bar-fill" id="volumeBar"></div>
                     </div>
-                    <span class="volume-label" id="volumeLabel">🔇 ...</span>
+                    <span class="volume-label" id="volumeLabel">...</span>
                 </div>
             </div>
             <div class="hud-right">
-                <button class="hud-btn" onclick="togglePause()" title="Pause">⏸</button>
-                <button class="hud-btn" onclick="toggleMusic()" title="Musik">🎵</button>
-                <button class="hud-btn" onclick="Game.showInstructions()" title="Cara Bermain">❓</button>
+                <button class="hud-btn" onclick="togglePause()" title="Pause"><svg class="btn-icon"><use href="#icon-pause"/></svg></button>
+                <button class="hud-btn" onclick="toggleMusic()" title="Musik"><svg class="btn-icon"><use href="#icon-music"/></svg></button>
+                <button class="hud-btn" onclick="Game.showInstructions()" title="Cara Bermain"><svg class="btn-icon"><use href="#icon-help"/></svg></button>
             </div>
         </div>
 
@@ -246,16 +280,16 @@
         <!-- Voice indicator -->
         <div id="voiceIndicator" class="overlay-hidden">
             <div class="voice-pulse"></div>
-            <span id="voiceText">🎤 TERIAK / BERSUARA KERAS!</span>
+            <span id="voiceText">TERIAK / BERSUARA KERAS!</span>
         </div>
 
         <!-- Checkpoint notification -->
-        <div id="checkpointNotif" class="overlay-hidden checkpoint-notif">📍 CHECKPOINT 0m</div>
+        <div id="checkpointNotif" class="overlay-hidden checkpoint-notif">CHECKPOINT 0m</div>
 
         <!-- Pause Menu -->
         <div id="pauseMenu" class="overlay-hidden">
             <div class="pause-container">
-                <div class="pause-icon">⏸️</div>
+                <div class="pause-icon"><svg><use href="#icon-pause"/></svg></div>
                 <h2>PAUSE</h2>
                 <p class="pause-sub">Arena menunggumu — istirahat sebentar.</p>
                 <div class="pause-stats">
@@ -269,10 +303,10 @@
                     </div>
                 </div>
                 <div class="pause-buttons">
-                    <button class="menu-btn primary" onclick="resumeGame()">▶ LANJUTKAN</button>
-                    <button class="menu-btn" onclick="toggleMusic()">🎵 MUSIK</button>
-                    <button class="menu-btn" onclick="Game.showInstructions()">❓ CARA MAIN</button>
-                    <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                    <button class="menu-btn primary" onclick="resumeGame()"><svg class="btn-icon"><use href="#icon-play"/></svg> LANJUTKAN</button>
+                    <button class="menu-btn" onclick="toggleMusic()"><svg class="btn-icon"><use href="#icon-music"/></svg> MUSIK</button>
+                    <button class="menu-btn" onclick="Game.showInstructions()"><svg class="btn-icon"><use href="#icon-help"/></svg> CARA MAIN</button>
+                    <button class="menu-btn exit" onclick="showMainMenu()"><svg class="btn-icon"><use href="#icon-home"/></svg> MAIN MENU</button>
                 </div>
             </div>
         </div>
@@ -281,7 +315,7 @@
         <div id="gameOverScreen" class="overlay-hidden">
             <div class="gameover-container">
                 <div class="go-banner">
-                    <div class="go-icon">💀</div>
+                    <div class="go-icon"><svg><use href="#icon-skull"/></svg></div>
                     <h2>GAME OVER</h2>
                 </div>
                 <div class="go-stats-grid">
@@ -294,14 +328,14 @@
                         <span class="go-stat-value go-stat-dist" id="finalDistance">0 m</span>
                     </div>
                 </div>
-                <p class="go-best">🏆 Rekor pribadimu: <span id="finalBest">0</span></p>
+                <p class="go-best"><svg class="mini-icon"><use href="#icon-trophy"/></svg> Rekor pribadimu: <span id="finalBest">0</span></p>
                 <div class="gameover-input">
                     <input type="text" id="playerName" placeholder="Nama kamu" maxlength="12" autocomplete="off">
                 </div>
                 <div class="go-actions">
-                    <button class="menu-btn ad" onclick="watchAd()">📺 TONTON IKLAN — LANJUT DI SINI</button>
-                    <button class="menu-btn primary" onclick="saveScoreAndRestart()">↻ MULAI DARI AWAL</button>
-                    <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                    <button class="menu-btn ad" onclick="watchAd()"><svg class="btn-icon"><use href="#icon-monitor"/></svg> TONTON IKLAN — LANJUT DI SINI</button>
+                    <button class="menu-btn primary" onclick="saveScoreAndRestart()"><svg class="btn-icon"><use href="#icon-refresh"/></svg> MULAI DARI AWAL</button>
+                    <button class="menu-btn exit" onclick="showMainMenu()"><svg class="btn-icon"><use href="#icon-home"/></svg> MAIN MENU</button>
                 </div>
             </div>
         </div>
@@ -309,9 +343,9 @@
         <!-- Win Screen (Multiplayer) -->
         <div id="winScreen" class="overlay-hidden">
             <div class="gameover-container win">
-                <h2>🏆 SELESAI! 🏆</h2>
+                <h2><svg class="title-icon"><use href="#icon-trophy"/></svg> SELESAI!</h2>
                 <div class="gameover-stats" id="multiplayerResults"></div>
-                <button class="menu-btn primary" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                <button class="menu-btn primary" onclick="showMainMenu()"><svg class="btn-icon"><use href="#icon-home"/></svg> MAIN MENU</button>
             </div>
         </div>
     </div>
@@ -319,7 +353,7 @@
     <!-- ========== LEADERBOARD ========== -->
     <div id="leaderboardScreen" class="screen">
         <div class="lb-container">
-            <h2>🏆 LEADERBOARD</h2>
+            <h2><svg class="title-icon"><use href="#icon-trophy"/></svg> LEADERBOARD</h2>
             <div class="lb-tabs">
                 <button class="lb-tab active" onclick="switchLbTab('local')" id="lbTabLocal">LOKAL</button>
                 <button class="lb-tab" onclick="switchLbTab('global')" id="lbTabGlobal">GLOBAL</button>
@@ -328,14 +362,41 @@
             <div class="lb-list" id="leaderboardList">
                 <div class="lb-empty">Belum ada skor. Ayo main!</div>
             </div>
-            <button class="back-btn" onclick="hideLeaderboard()">← KEMBALI</button>
+            <button class="back-btn" onclick="hideLeaderboard()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> KEMBALI</button>
         </div>
     </div>
 
-    <!-- ========== AUTH (LOGIN / DAFTAR / LUPA PASSWORD) ========== -->
+    <!-- ========== PROFILE (LOGIN / DAFTAR / LUPA PASSWORD) ========== -->
     <div id="authScreen" class="screen">
         <div class="auth-container">
-            <h2>👤 AKUN</h2>
+            <h2><svg class="title-icon"><use href="#icon-user"/></svg> PROFILE</h2>
+
+            <!-- ===== KARTU PROFIL (statis, lengkap) ===== -->
+            <div class="profile-card">
+                <div class="profile-avatar" id="profileAvatar"><svg><use href="#icon-user"/></svg></div>
+                <div class="profile-meta">
+                    <div class="profile-name" id="profileName">Guest</div>
+                    <div class="profile-email" id="profileEmail">Belum masuk</div>
+                    <span class="profile-badge" id="profileBadge">GUEST</span>
+                </div>
+            </div>
+
+            <!-- ===== STATISTIK (dari localStorage) ===== -->
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <span class="profile-stat-value" id="profileBestScore">0</span>
+                    <span class="profile-stat-label">SKOR TERBAIK</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-value" id="profileBestDist">0m</span>
+                    <span class="profile-stat-label">JARAK TERJAUH</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-value" id="profileGames">0</span>
+                    <span class="profile-stat-label">GAME DIMAINKAN</span>
+                </div>
+            </div>
+
             <div class="auth-tabs">
                 <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">MASUK</button>
                 <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">DAFTAR</button>
@@ -347,7 +408,7 @@
                 <div class="account-form">
                     <input type="email" id="authEmail" placeholder="Email" maxlength="64" autocomplete="email">
                     <input type="password" id="authPassword" placeholder="Password" maxlength="64" autocomplete="current-password">
-                    <button class="menu-btn primary" onclick="submitLogin()"><span class="btn-icon">🔑</span> MASUK</button>
+                    <button class="menu-btn primary" onclick="submitLogin()"><svg class="btn-icon"><use href="#icon-key"/></svg> MASUK</button>
                 </div>
                 <button class="auth-link" onclick="switchAuthTab('forgot')">Lupa password?</button>
             </div>
@@ -360,7 +421,7 @@
                     <input type="email" id="authEmailReg" placeholder="Email" maxlength="64" autocomplete="email">
                     <input type="password" id="authPasswordReg" placeholder="Password (min 6 karakter)" maxlength="64" autocomplete="new-password">
                     <input type="password" id="authPasswordReg2" placeholder="Ulangi password" maxlength="64" autocomplete="new-password">
-                    <button class="menu-btn primary" onclick="submitRegister()"><span class="btn-icon">✅</span> DAFTAR AKUN</button>
+                    <button class="menu-btn primary" onclick="submitRegister()"><svg class="btn-icon"><use href="#icon-check"/></svg> DAFTAR AKUN</button>
                 </div>
             </div>
 
@@ -369,22 +430,51 @@
                 <p class="auth-hint">Masukkan email akunmu — kami kirim tautan untuk mereset password.</p>
                 <div class="account-form">
                     <input type="email" id="authEmailForgot" placeholder="Email" maxlength="64" autocomplete="email">
-                    <button class="menu-btn primary" onclick="submitForgotPassword()"><span class="btn-icon">📧</span> KIRIM TAUTAN RESET</button>
+                    <button class="menu-btn primary" onclick="submitForgotPassword()"><svg class="btn-icon"><use href="#icon-mail"/></svg> KIRIM TAUTAN RESET</button>
                 </div>
             </div>
 
+            <!-- KELUAR (untuk akun permanen) -->
+            <div class="auth-panel" id="authPanelLoggedIn" style="display:none;">
+                <p class="auth-hint" id="authLoggedInInfo">Kamu sudah masuk sebagai akun permanen.</p>
+                <button class="menu-btn" onclick="switchAuthTab('forgot')"><svg class="btn-icon"><use href="#icon-mail"/></svg> RESET PASSWORD</button>
+                <button class="menu-btn exit" onclick="logoutAccount()"><svg class="btn-icon"><use href="#icon-logout"/></svg> KELUAR</button>
+            </div>
+
+            <!-- ===== MODERASI (khusus admin/moderator — tampil otomatis) ===== -->
+            <div id="moderationSection" class="auth-panel" style="display:none;">
+                <div class="mod-header">
+                    <svg class="mini-icon"><use href="#icon-shield"/></svg>
+                    <h3 class="setting-section-title" style="margin-bottom:0;">MODERASI</h3>
+                </div>
+                <div id="adminRoleBox" style="display:none;">
+                    <p class="auth-hint" style="margin-bottom:0.6rem;text-align:left;">Atur role user (khusus Admin):</p>
+                    <div class="account-form">
+                        <input type="text" id="modUid" placeholder="UID user (dari Firebase Auth)" maxlength="64">
+                        <select id="modRoleSelect">
+                            <option value="user">user</option>
+                            <option value="moderator">moderator</option>
+                            <option value="anon">anon</option>
+                        </select>
+                        <button class="menu-btn primary" onclick="applyRole()"><svg class="btn-icon"><use href="#icon-check"/></svg> TERAPKAN ROLE</button>
+                    </div>
+                    <div id="modMsg" class="mp-status" style="display:none;"></div>
+                </div>
+                <p class="auth-hint" style="margin-bottom:0;text-align:left;">Hapus skor mencurigakan lewat tab <b>GLOBAL</b> di leaderboard (tombol hapus muncul di tiap entry).</p>
+            </div>
+
             <div id="authMsg" class="mp-status" style="display:none;"></div>
-            <button class="back-btn" onclick="hideAuth()">← KEMBALI</button>
+            <button class="back-btn" onclick="hideAuth()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> KEMBALI</button>
         </div>
     </div>
 
     <!-- ========== SETTINGS ========== -->
     <div id="settingsScreen" class="screen">
         <div class="settings-container">
-            <h2>⚙ SETTINGS</h2>
+            <h2><svg class="title-icon"><use href="#icon-settings"/></svg> SETTINGS</h2>
             <div class="setting-item">
                 <div class="setting-info">
-                    <span class="setting-label">🎵 Musik</span>
+                    <span class="setting-label"><svg class="mini-icon"><use href="#icon-music"/></svg> Musik</span>
                     <span class="setting-desc">Musik latar belakang</span>
                 </div>
                 <label class="toggle">
@@ -394,7 +484,7 @@
             </div>
             <div class="setting-item">
                 <div class="setting-info">
-                    <span class="setting-label">🔊 SFX</span>
+                    <span class="setting-label"><svg class="mini-icon"><use href="#icon-volume"/></svg> SFX</span>
                     <span class="setting-desc">Efek suara</span>
                 </div>
                 <label class="toggle">
@@ -404,7 +494,7 @@
             </div>
             <div class="setting-item">
                 <div class="setting-info">
-                    <span class="setting-label">🎤 Sensitivitas Mikrofon</span>
+                    <span class="setting-label"><svg class="mini-icon"><use href="#icon-mic"/></svg> Sensitivitas Mikrofon</span>
                     <span class="setting-desc">Seberapa ketat pencocokan suara</span>
                 </div>
                 <div class="setting-slider">
@@ -414,48 +504,13 @@
             </div>
             <div class="setting-item danger">
                 <div class="setting-info">
-                    <span class="setting-label">⚠ Reset Data</span>
+                    <span class="setting-label"><svg class="mini-icon"><use href="#icon-alert"/></svg> Reset Data</span>
                     <span class="setting-desc">Hapus semua skor dan progress</span>
                 </div>
                 <button class="danger-btn" onclick="resetAllData()">RESET</button>
             </div>
 
-            <!-- ===== AKUN (Guest ↔ permanen) ===== -->
-            <div class="setting-section">
-                <h3 class="setting-section-title">👤 AKUN</h3>
-                <div class="account-status" id="accountStatus">Menghubungkan...</div>
-                <div id="accountGuestBox" class="account-box" style="display:none;">
-                    <p class="setting-desc">Kamu bermain sebagai <b>Guest (anonim)</b>. Skor otomatis masuk leaderboard, tapi kalau data browser dihapus, akun Guest hilang. Buka halaman akun untuk daftar akun permanen — skor Guest-mu otomatis ikut tersimpan.</p>
-                    <button class="menu-btn primary" onclick="showAuth('register')"><span class="btn-icon">🔁</span> DAFTAR / UPGRADE AKUN</button>
-                    <button class="menu-btn" onclick="showAuth('login')"><span class="btn-icon">🔑</span> MASUK</button>
-                </div>
-                <div id="accountUserBox" class="account-box" style="display:none;">
-                    <p id="accountUserInfo" class="setting-desc"></p>
-                    <button class="menu-btn" onclick="showAuth('forgot')"><span class="btn-icon">📧</span> RESET PASSWORD</button>
-                    <button class="menu-btn" onclick="logoutAccount()"><span class="btn-icon">🚪</span> KELUAR</button>
-                </div>
-            </div>
-
-            <!-- ===== MODERASI (hanya tampil utk admin/moderator) ===== -->
-            <div id="moderationSection" class="setting-section" style="display:none;">
-                <h3 class="setting-section-title">🛡️ MODERASI</h3>
-                <div id="adminRoleBox" style="display:none;">
-                    <p class="setting-desc">Atur role user (khusus Admin):</p>
-                    <div class="account-form">
-                        <input type="text" id="modUid" placeholder="UID user (dari Firebase Auth)" maxlength="64">
-                        <select id="modRoleSelect">
-                            <option value="user">user</option>
-                            <option value="moderator">moderator</option>
-                            <option value="anon">anon</option>
-                        </select>
-                        <button class="menu-btn primary" onclick="applyRole()"><span class="btn-icon">✅</span> TERAPKAN ROLE</button>
-                    </div>
-                    <div id="modMsg" class="mp-status" style="display:none;"></div>
-                </div>
-                <p class="setting-desc">🗑 Hapus skor mencurigakan lewat tab <b>GLOBAL</b> di leaderboard (tombol 🗑 muncul di tiap entry).</p>
-            </div>
-
-            <button class="back-btn" onclick="hideSettings()">← KEMBALI</button>
+            <button class="back-btn" onclick="hideSettings()"><svg class="btn-icon"><use href="#icon-chevron-left"/></svg> KEMBALI</button>
         </div>
     </div>
 
@@ -474,16 +529,16 @@
     <!-- ========== MIC PERMISSION OVERLAY ========== -->
     <div id="micPermissionOverlay" class="overlay-hidden">
         <div class="confirm-dialog mic-dialog">
-            <div class="mic-icon">🎤</div>
+            <div class="mic-icon"><svg><use href="#icon-mic"/></svg></div>
             <h3>Akses Mikrofon Diperlukan</h3>
             <p>Voice Runner perlu akses mikrofon untuk fitur Voice Challenge!</p>
             <p class="mic-detail">Bersuara/teriak untuk melompat, dan TERIAK keras untuk mengisi lubang.</p>
             <div class="confirm-buttons">
                 <button class="menu-btn primary" onclick="Game.allowMic()">
-                    <span class="btn-icon">✅</span> IZINKAN
+                    <svg class="btn-icon"><use href="#icon-check"/></svg> IZINKAN
                 </button>
                 <button class="menu-btn" onclick="Game.denyMic()">
-                    <span class="btn-icon">❌</span> LEWATKAN
+                    <svg class="btn-icon"><use href="#icon-x"/></svg> LEWATKAN
                 </button>
             </div>
             <p class="ad-note">Kamu bisa mengubah izin ini kapan saja di Settings browser.</p>
@@ -493,10 +548,10 @@
     <!-- ========== INSTRUCTIONS OVERLAY ========== -->
     <div id="instructionsOverlay" class="overlay-hidden instructions-overlay">
         <div class="instructions-content">
-            <h2>🎮 CARA BERMAIN</h2>
+            <h2><svg class="title-icon"><use href="#icon-help"/></svg> CARA BERMAIN</h2>
             <div class="instruction-steps">
                 <div class="instruction-item">
-                    <span class="instr-icon">🗣️</span>
+                    <span class="instr-icon"><svg><use href="#icon-volume"/></svg></span>
                     <div>
                         <strong>1. Buat Suara untuk Lompat!</strong>
                         <p>Semakin keras suaramu, semakin tinggi lompatan!</p>
@@ -504,47 +559,47 @@
                 </div>
                 <div class="instruction-volumes">
                     <div class="vol-item low">
-                        <span class="vol-icon">🔇</span>
+                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">Pelan → Lompat rendah</span>
-                        <span class="vol-type">🔼 Spike</span>
+                        <span class="vol-type">Spike</span>
                     </div>
                     <div class="vol-item mid">
-                        <span class="vol-icon">🗣️</span>
+                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">Normal → Lompat sedang</span>
-                        <span class="vol-type">📦 Box</span>
+                        <span class="vol-type">Box</span>
                     </div>
                     <div class="vol-item high">
-                        <span class="vol-icon">📢</span>
+                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">KERAS → Lompat tinggi</span>
-                        <span class="vol-type">🏛️ Tiang</span>
+                        <span class="vol-type">Tiang</span>
                     </div>
                 </div>
                 <div class="instruction-item">
-                    <span class="instr-icon">🕳️</span>
+                    <span class="instr-icon"><svg><use href="#icon-alert"/></svg></span>
                     <div>
                         <strong>2. TERIAK untuk Mengisi Lubang!</strong>
                         <p>Ada balon di atas lubang — TERIAK keras untuk memecahkannya, kotak jatuh mengisi lubang!</p>
                     </div>
                 </div>
                 <div class="instruction-item">
-                    <span class="instr-icon">📍</span>
+                    <span class="instr-icon"><svg><use href="#icon-map-pin"/></svg></span>
                     <div>
                         <strong>3. Nyawa & Game Over</strong>
                         <p>Nyawa habis = Game Over. Tonton iklan untuk lanjut dari titik kematian, atau mulai dari awal!</p>
                     </div>
                 </div>
             </div>
-            <button class="menu-btn primary" onclick="Game.hideInstructions()">🎮 MULAI MAIN!</button>
+            <button class="menu-btn primary" onclick="Game.hideInstructions()"><svg class="btn-icon"><use href="#icon-play"/></svg> MULAI MAIN!</button>
         </div>
     </div>
 
     <!-- ========== AD PLACEHOLDER ========== -->
     <div id="adPlaceholder" class="overlay-hidden">
         <div class="confirm-dialog">
-            <h3>📺 IKLAN</h3>
+            <h3><svg class="title-icon"><use href="#icon-monitor"/></svg> IKLAN</h3>
             <p>Iklan diputar... Setelah selesai, kamu lanjut dari titik kematian!</p>
             <p class="ad-note">(Integrasi AdNetwork menyusul — saat ini simulasi)</p>
-            <button class="menu-btn primary" onclick="closeAd()">✅ LANJUTKAN GAME</button>
+            <button class="menu-btn primary" onclick="closeAd()"><svg class="btn-icon"><use href="#icon-check"/></svg> LANJUTKAN GAME</button>
         </div>
     </div>
 

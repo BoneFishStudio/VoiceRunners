@@ -1025,7 +1025,7 @@ const Game = {
             const indicator = document.getElementById('voiceIndicator');
             if (indicator) {
                 indicator.classList.remove('overlay-hidden');
-                document.getElementById('voiceText').textContent = '🎤 TERIAK / BERSUARA KERAS!';
+                document.getElementById('voiceText').textContent = 'TERIAK / BERSUARA KERAS!';
                 document.querySelector('.voice-pulse').className = 'voice-pulse listening';
             }
         }
@@ -1166,7 +1166,7 @@ const Game = {
         this.scorePopups.push({
             x: p.x,
             y: p.groundY - 80,
-            text: level === 1 ? '🔇 Pelan' : level === 2 ? '🗣️ Normal' : '📢 KERAS!',
+            text: level === 1 ? 'Pelan' : level === 2 ? 'Normal' : 'KERAS!',
             life: 0.8,
             scale: 0.4
         });
@@ -1182,13 +1182,13 @@ const Game = {
             else bar.style.background = '#44ff44';
         }
         
-        // Update label volume
+        // Update label volume (teks saja, icon ada di SVG sprite)
         const label = document.getElementById('volumeLabel');
         if (label) {
-            if (volume > 0.25) label.textContent = '📢 KERAS!';
-            else if (volume > 0.12) label.textContent = '🗣️ Normal';
-            else if (volume > 0.06) label.textContent = '🔇 Pelan';
-            else label.textContent = '🔇 ...';
+            if (volume > 0.25) label.textContent = 'KERAS!';
+            else if (volume > 0.12) label.textContent = 'Normal';
+            else if (volume > 0.06) label.textContent = 'Pelan';
+            else label.textContent = '...';
         }
     },
     
@@ -1372,7 +1372,7 @@ const Game = {
     showCheckpointNotification() {
         const el = document.getElementById('checkpointNotif');
         if (!el) return;
-        el.textContent = `📍 CHECKPOINT ${Math.floor(this.checkpointDistance)}m`;
+        el.textContent = `CHECKPOINT ${Math.floor(this.checkpointDistance)}m`;
         el.classList.remove('overlay-hidden');
         // Animasi CSS via class
         el.classList.remove('cp-animate');
@@ -1402,7 +1402,7 @@ const Game = {
             }
         } else {
             leaderboard.push({
-                name: '📍 Checkpoint',
+                name: 'Checkpoint',
                 type: 'checkpoint',
                 score: this.checkpointScore,
                 distance: this.checkpointDistance,
@@ -1634,7 +1634,7 @@ const Game = {
         // Show voice indicator
         const indicator = document.getElementById('voiceIndicator');
         indicator.classList.remove('overlay-hidden');
-        document.getElementById('voiceText').textContent = '🎤 Ucapkan: "' + text + '"';
+        document.getElementById('voiceText').textContent = 'Ucapkan: "' + text + '"';
         document.querySelector('.voice-pulse').className = 'voice-pulse listening';
         
         try {
@@ -1667,7 +1667,7 @@ const Game = {
                 console.warn('Speech error:', event.error);
                 if (event.error === 'not-allowed') {
                     // Mic permission denied - fallback
-                    document.getElementById('voiceText').textContent = '🔇 Izinkan mic di settings browser';
+                    document.getElementById('voiceText').textContent = 'Izinkan mic di settings browser';
                     setTimeout(() => {
                         if (this.activePit && !this.activePit.filled && !this.activePit.failed) {
                             this.fillPit();
@@ -1739,7 +1739,7 @@ const Game = {
         
         // Visual feedback
         document.querySelector('.voice-pulse').className = 'voice-pulse success';
-        document.getElementById('voiceText').textContent = '✅ Benar! +50';
+        document.getElementById('voiceText').textContent = 'Benar! +50';
         AudioManager.playSFX('voiceSuccess');
         
         // Score bonus
@@ -1953,8 +1953,16 @@ const Game = {
     // ===== HUD =====
     
     updateHUD() {
-        const livesStr = '❤️'.repeat(Math.max(0, this.lives));
-        document.getElementById('livesDisplay').textContent = livesStr || '💀';
+        // Nyawa pakai SVG heart (bukan emoji)
+        const livesEl = document.getElementById('livesDisplay');
+        if (livesEl) {
+            const hearts = Math.max(0, this.lives);
+            if (hearts > 0) {
+                livesEl.innerHTML = '<svg class="life-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-heart"/></svg>'.repeat(hearts);
+            } else {
+                livesEl.innerHTML = '<svg class="life-icon dead" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-skull"/></svg>';
+            }
+        }
         document.getElementById('scoreDisplay').textContent = 'Skor: ' + this.score;
         document.getElementById('distanceDisplay').textContent = Math.floor(this.distance) + ' m';
     },
@@ -3401,11 +3409,12 @@ function updateLeaderboard(type = 'local') {
                     div.className = 'lb-item';
                     const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
                     const isMe = myUid && entry.uid === myUid;
-                    const guest = entry.isGuest ? ' <span class="lb-guest" title="Akun anonim">👤 Guest</span>' : '';
+                    const guest = entry.isGuest
+                        ? ' <span class="lb-guest" title="Akun anonim"><svg class="lb-icon"><use href="#icon-user"/></svg> Guest</span>' : '';
                     const flag = isSuspiciousScore(entry)
-                        ? ' <span class="lb-flag" title="Skor mencurigakan — perlu review moderator">⚠️</span>' : '';
+                        ? ' <span class="lb-flag" title="Skor mencurigakan — perlu review moderator"><svg class="lb-icon"><use href="#icon-alert"/></svg></span>' : '';
                     const del = canMod
-                        ? ` <button class="lb-del" onclick="deleteGlobalEntry('${entry.uid}')" title="Hapus entry (moderasi)">🗑</button>` : '';
+                        ? ` <button class="lb-del" onclick="deleteGlobalEntry('${entry.uid}')" title="Hapus entry (moderasi)"><svg class="lb-icon"><use href="#icon-trash"/></svg></button>` : '';
                     div.innerHTML = `
                         <span class="lb-rank ${rankClass}">${index + 1}</span>
                         <span class="lb-name">${escapeHtml(entry.name || 'Anonim')}${guest}${flag}${isMe ? ' <span class="lb-you">(kamu)</span>' : ''}</span>
