@@ -640,13 +640,20 @@ function loadGlobalLeaderboard(limit) {
 // Terjemahkan pesan error Firebase Auth ke Bahasa Indonesia yang ramah user
 function friendlyAuthError(codeOrMsg) {
     const m = String(codeOrMsg || '');
-    if (m.indexOf('email-already-in-use') !== -1) return 'Email sudah terdaftar. Coba gunakan tombol MASUK, bukan DAFTAR.';
+    // Urutan penting: cek kode spesifik dulu sebelum generic
+    if (m.indexOf('operation-not-allowed') !== -1 || m.indexOf('OPERATION_NOT_ALLOWED') !== -1) {
+        return 'Login Email/Password belum diaktifkan di Firebase Console (Authentication → Sign-in method). Aktifkan dulu, lalu coba lagi.';
+    }
+    if (m.indexOf('invalid-login-credentials') !== -1 || m.indexOf('INVALID_LOGIN_CREDENTIALS') !== -1) return 'Email atau password salah.';
+    if (m.indexOf('invalid-credential') !== -1) return 'Email atau password salah.';
+    if (m.indexOf('email-already-in-use') !== -1) return 'Email sudah terdaftar. Gunakan tombol MASUK.';
     if (m.indexOf('credential-already-in-use') !== -1) return 'Email ini sudah terhubung ke akun lain.';
     if (m.indexOf('invalid-email') !== -1) return 'Format email tidak valid.';
     if (m.indexOf('weak-password') !== -1) return 'Password terlalu lemah (minimal 6 karakter).';
     if (m.indexOf('wrong-password') !== -1) return 'Password salah.';
-    if (m.indexOf('user-not-found') !== -1) return 'Akun tidak ditemukan. Periksa email atau daftar dulu.';
-    if (m.indexOf('too-many-requests') !== -1) return 'Terlalu banyak percobaan. Coba lagi beberapa saat.';
+    if (m.indexOf('user-not-found') !== -1 || m.indexOf('email-not-found') !== -1) return 'Akun tidak ditemukan. Periksa email atau daftar dulu.';
+    if (m.indexOf('too-many-requests') !== -1 || m.indexOf('too-many-attempts') !== -1) return 'Terlalu banyak percobaan. Coba lagi beberapa saat.';
+    if (m.indexOf('requires-recent-login') !== -1) return 'Sesi sudah lama. Keluar lalu masuk lagi, lalu ulangi.';
     if (m.indexOf('network') !== -1 || m.indexOf('unavailable') !== -1) return 'Koneksi internet bermasalah. Coba lagi.';
     return m;
 }
@@ -776,40 +783,111 @@ function refreshAccountUI() {
     }
 }
 
-async function upgradeAccount() {
-    const msg = document.getElementById('accountMsg');
-    const email = document.getElementById('accEmail').value.trim();
-    const password = document.getElementById('accPassword').value;
-    const name = document.getElementById('accName').value.trim() || 'Pemain';
-    if (!email || password.length < 6) {
-        showStatusEl(msg, 'Email wajib diisi & password minimal 6 karakter.', 'error');
-        return;
-    }
-    const res = await registerOrLinkAccount(email, password, name);
-    if (res.ok) {
-        showStatusEl(msg, res.upgraded
-            ? '✅ Akun berhasil dibuat! Skor Guest-mu tetap tersimpan & kini tersinkron antar device.'
-            : '✅ Akun berhasil didaftarkan!', 'success');
-        refreshAccountUI();
+// ============================================================
+// 🚪 HALAMAN AUTH (Login / Daftar / Lupa Password)
+// ============================================================
+
+function showAuth(tab) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('authScreen').classList.add('active');
+    if (typeof Game !== 'undefined') Game.state = 'menu';
+    switchAuthTab(tab || 'login');
+    refreshAuthStatus();
+}
+
+function hideAuth() {
+    document.getElementById('authScreen').classList.remove('active');
+    document.getElementById('mainMenu').classList.add('active');
+    if (typeof refreshAccountUI === 'function') refreshAccountUI();
+}
+
+function switchAuthTab(tab) {
+    document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
+    document.getElementById('authTabRegister').classList.toggle('active', tab === 'register');
+    document.getElementById('authPanelLogin').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('authPanelRegister').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('authPanelForgot').style.display = tab === 'forgot' ? 'block' : 'none';
+    if (typeof refreshAuthStatus === 'function') refreshAuthStatus();
+}
+
+function refreshAuthStatus() {
+    const el = document.getElementById('authStatus');
+    if (!el) return;
+    if (!authUser) {
+        el.innerHTML = '⏳ Menghubungkan...';
+    } else if (authUser.isAnonymous) {
+        el.innerHTML = '🎭 Kamu masuk sebagai <b>Guest (anonim)</b>. Daftar akun untuk menyimpan skor permanen di server.';
     } else {
-        showStatusEl(msg, '❌ ' + friendlyAuthError(res.msg), 'error');
+        const label = authUser.displayName || authUser.email || 'Akun';
+        el.innerHTML = '👤 <b>' + escapeHtml(label) + '</b> — <span class="auth-ok">akun permanen</span> ✓';
     }
 }
 
-async function loginAccount() {
-    const msg = document.getElementById('accountMsg');
-    const email = document.getElementById('accEmail').value.trim();
-    const password = document.getElementById('accPassword').value;
-    if (!email || !password) {
-        showStatusEl(msg, 'Masukkan email & password.', 'error');
-        return;
-    }
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email || '');
+}
+
+function authMsg(msg, type) {
+    showStatusEl(document.getElementById('authMsg'), msg, type);
+}
+
+async function submitLogin() {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
+    if (!password) { authMsg('❌ Password wajib diisi.', 'error'); return; }
     const res = await loginEmailAccount(email, password);
     if (res.ok) {
-        showStatusEl(msg, '✅ Berhasil masuk! Skor akunmu tampil di leaderboard global.', 'success');
-        refreshAccountUI();
+        authMsg('✅ Berhasil masuk! Skor akunmu tampil di leaderboard global.', 'success');
+        refreshAuthStatus();
+        if (typeof refreshAccountUI === 'function') refreshAccountUI();
     } else {
-        showStatusEl(msg, '❌ ' + friendlyAuthError(res.msg), 'error');
+        authMsg('❌ ' + friendlyAuthError(res.msg), 'error');
+    }
+}
+
+async function submitRegister() {
+    const name = document.getElementById('authName').value.trim();
+    const email = document.getElementById('authEmailReg').value.trim();
+    const password = document.getElementById('authPasswordReg').value;
+    const password2 = document.getElementById('authPasswordReg2').value;
+    // Kalau sudah masuk sebagai akun permanen, jangan buat akun kedua secara diam-diam
+    if (authUser && !authUser.isAnonymous) {
+        authMsg('ℹ️ Kamu sudah masuk sebagai akun permanen (' + escapeHtml(authUser.email || '') + '). Keluar dulu untuk mendaftar akun baru.', 'info');
+        return;
+    }
+    if (!name) { authMsg('❌ Nama tampilan wajib diisi.', 'error'); return; }
+    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
+    if (password.length < 6) { authMsg('❌ Password minimal 6 karakter.', 'error'); return; }
+    if (password !== password2) { authMsg('❌ Konfirmasi password tidak cocok.', 'error'); return; }
+    const res = await registerOrLinkAccount(email, password, name);
+    if (res.ok) {
+        authMsg(res.upgraded
+            ? '✅ Akun berhasil dibuat! Skor Guest-mu tetap tersimpan & kini tersinkron antar device.'
+            : '✅ Akun berhasil didaftarkan!', 'success');
+        // Kirim email verifikasi (opsional — banyak game tidak wajib)
+        try {
+            const u = firebase.auth().currentUser;
+            if (u && !u.emailVerified) {
+                u.sendEmailVerification().catch(() => {});
+            }
+        } catch(e) {}
+        refreshAuthStatus();
+        if (typeof refreshAccountUI === 'function') refreshAccountUI();
+    } else {
+        authMsg('❌ ' + friendlyAuthError(res.msg), 'error');
+    }
+}
+
+async function submitForgotPassword() {
+    const email = document.getElementById('authEmailForgot').value.trim();
+    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
+    try {
+        await firebase.auth().sendPasswordResetEmail(email);
+        // Pesan generic — jangan bocorkan apakah email itu terdaftar (anti user enumeration)
+        authMsg('📧 Kalau email ' + escapeHtml(email) + ' terdaftar, tautan reset sudah dikirim. Cek inbox (termasuk spam)!', 'success');
+    } catch(e) {
+        authMsg('📧 Kalau email ' + escapeHtml(email) + ' terdaftar, tautan reset sudah dikirim. Cek inbox (termasuk spam)!', 'success');
     }
 }
 

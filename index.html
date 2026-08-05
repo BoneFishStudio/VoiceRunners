@@ -60,6 +60,9 @@
                         <button class="menu-btn" onclick="showSettings()">
                             <span class="btn-icon">⚙</span> SETTINGS
                         </button>
+                        <button class="menu-btn" onclick="showAuth('login')">
+                            <span class="btn-icon">👤</span> AKUN
+                        </button>
                         <button class="menu-btn exit" onclick="exitGame()">
                             <span class="btn-icon">✕</span> EXIT
                         </button>
@@ -106,6 +109,9 @@
                 </button>
                 <button class="menu-btn" onclick="showSettings()">
                     <span class="btn-icon">⚙</span> SETTINGS
+                </button>
+                <button class="menu-btn" onclick="showAuth('login')">
+                    <span class="btn-icon">👤</span> AKUN
                 </button>
                 <button class="menu-btn exit" onclick="exitGame()">
                     <span class="btn-icon">✕</span> EXIT
@@ -326,6 +332,52 @@
         </div>
     </div>
 
+    <!-- ========== AUTH (LOGIN / DAFTAR / LUPA PASSWORD) ========== -->
+    <div id="authScreen" class="screen">
+        <div class="auth-container">
+            <h2>👤 AKUN</h2>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">MASUK</button>
+                <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">DAFTAR</button>
+            </div>
+            <div class="auth-status" id="authStatus">Menghubungkan...</div>
+
+            <!-- LOGIN PANEL -->
+            <div class="auth-panel" id="authPanelLogin">
+                <div class="account-form">
+                    <input type="email" id="authEmail" placeholder="Email" maxlength="64" autocomplete="email">
+                    <input type="password" id="authPassword" placeholder="Password" maxlength="64" autocomplete="current-password">
+                    <button class="menu-btn primary" onclick="submitLogin()"><span class="btn-icon">🔑</span> MASUK</button>
+                </div>
+                <button class="auth-link" onclick="switchAuthTab('forgot')">Lupa password?</button>
+            </div>
+
+            <!-- REGISTER PANEL -->
+            <div class="auth-panel" id="authPanelRegister" style="display:none;">
+                <p class="auth-hint">Daftar akun permanen — skor Guest-mu otomatis ikut tersimpan & bisa diakses dari device lain.</p>
+                <div class="account-form">
+                    <input type="text" id="authName" placeholder="Nama tampilan (maks 20)" maxlength="20" autocomplete="nickname">
+                    <input type="email" id="authEmailReg" placeholder="Email" maxlength="64" autocomplete="email">
+                    <input type="password" id="authPasswordReg" placeholder="Password (min 6 karakter)" maxlength="64" autocomplete="new-password">
+                    <input type="password" id="authPasswordReg2" placeholder="Ulangi password" maxlength="64" autocomplete="new-password">
+                    <button class="menu-btn primary" onclick="submitRegister()"><span class="btn-icon">✅</span> DAFTAR AKUN</button>
+                </div>
+            </div>
+
+            <!-- FORGOT PASSWORD PANEL -->
+            <div class="auth-panel" id="authPanelForgot" style="display:none;">
+                <p class="auth-hint">Masukkan email akunmu — kami kirim tautan untuk mereset password.</p>
+                <div class="account-form">
+                    <input type="email" id="authEmailForgot" placeholder="Email" maxlength="64" autocomplete="email">
+                    <button class="menu-btn primary" onclick="submitForgotPassword()"><span class="btn-icon">📧</span> KIRIM TAUTAN RESET</button>
+                </div>
+            </div>
+
+            <div id="authMsg" class="mp-status" style="display:none;"></div>
+            <button class="back-btn" onclick="hideAuth()">← KEMBALI</button>
+        </div>
+    </div>
+
     <!-- ========== SETTINGS ========== -->
     <div id="settingsScreen" class="screen">
         <div class="settings-container">
@@ -373,18 +425,13 @@
                 <h3 class="setting-section-title">👤 AKUN</h3>
                 <div class="account-status" id="accountStatus">Menghubungkan...</div>
                 <div id="accountGuestBox" class="account-box" style="display:none;">
-                    <p class="setting-desc">Kamu bermain sebagai <b>Guest (anonim)</b>. Skor otomatis masuk ke leaderboard, tapi kalau data browser dihapus, akun Guest hilang. Daftar akun permanen untuk menyimpan skor di server & login dari device lain tanpa kehilangan progress.</p>
-                    <div class="account-form">
-                        <input type="text" id="accName" placeholder="Nama tampilan (maks 20)" maxlength="20">
-                        <input type="email" id="accEmail" placeholder="Email" maxlength="64">
-                        <input type="password" id="accPassword" placeholder="Password (min 6 karakter)" maxlength="64">
-                        <button class="menu-btn primary" onclick="upgradeAccount()"><span class="btn-icon">🔁</span> UPGRADE KE AKUN PERMANEN</button>
-                        <button class="menu-btn" onclick="loginAccount()"><span class="btn-icon">🔑</span> MASUK AKUN</button>
-                    </div>
-                    <div id="accountMsg" class="mp-status" style="display:none;"></div>
+                    <p class="setting-desc">Kamu bermain sebagai <b>Guest (anonim)</b>. Skor otomatis masuk leaderboard, tapi kalau data browser dihapus, akun Guest hilang. Buka halaman akun untuk daftar akun permanen — skor Guest-mu otomatis ikut tersimpan.</p>
+                    <button class="menu-btn primary" onclick="showAuth('register')"><span class="btn-icon">🔁</span> DAFTAR / UPGRADE AKUN</button>
+                    <button class="menu-btn" onclick="showAuth('login')"><span class="btn-icon">🔑</span> MASUK</button>
                 </div>
                 <div id="accountUserBox" class="account-box" style="display:none;">
                     <p id="accountUserInfo" class="setting-desc"></p>
+                    <button class="menu-btn" onclick="showAuth('forgot')"><span class="btn-icon">📧</span> RESET PASSWORD</button>
                     <button class="menu-btn" onclick="logoutAccount()"><span class="btn-icon">🚪</span> KELUAR</button>
                 </div>
             </div>

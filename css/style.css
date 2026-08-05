@@ -1815,6 +1815,111 @@ body::-webkit-scrollbar {
     justify-content: center;
 }
 
+/* ===== AUTH SCREEN (LOGIN / DAFTAR / LUPA PASSWORD) ===== */
+.auth-container {
+    text-align: center;
+    padding: clamp(1.5rem, 5vw, 2.5rem);
+    width: min(92vw, 420px);
+    background: linear-gradient(165deg, rgba(26,30,38,0.95) 0%, rgba(10,12,18,0.97) 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    box-shadow: 0 0 60px rgba(100,200,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
+    margin: auto;
+}
+
+.auth-container h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+    letter-spacing: 3px;
+    color: var(--text);
+    margin-bottom: 1.2rem;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 0.7rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.25s;
+    touch-action: manipulation;
+}
+
+.auth-tab:hover {
+    border-color: var(--text);
+    color: var(--text);
+}
+
+.auth-tab.active {
+    background: linear-gradient(135deg, #1b6bd6, #4bb8ff);
+    border-color: #4bb8ff;
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(75,184,255,0.35);
+}
+
+.auth-status {
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    background: var(--surface);
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.auth-status .auth-ok {
+    color: var(--success);
+}
+
+.auth-panel {
+    text-align: left;
+}
+
+.auth-panel .account-form {
+    margin-top: 0.4rem;
+}
+
+.auth-hint {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.auth-link {
+    display: block;
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: #4bb8ff;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: color 0.25s;
+    touch-action: manipulation;
+}
+
+.auth-link:hover {
+    color: var(--text);
+    text-decoration: underline;
+}
+
 /* ==================================================================
    RESPONSIVE OVERHAUL — semua ukuran layar (320px → desktop)
    ================================================================== */
