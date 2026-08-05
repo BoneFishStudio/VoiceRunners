@@ -60,6 +60,46 @@
         "isGuest": { ".validate": "newData.isBoolean()" },
         "$other": { ".validate": false }
       }
+    },
+
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('userRoles').child(auth.uid).val() === 'admin' || root.child('userRoles').child(auth.uid).val() === 'moderator')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('userRoles').child(auth.uid).val() === 'admin')",
+        "profile": {
+          ".validate": "newData.isObject()",
+          "displayName": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "photoURL": { ".validate": "newData.isString() && newData.val().length <= 500" },
+          "email": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "lastLogin": { ".validate": "newData.isNumber()" },
+          "country": { ".validate": "newData.isString() && newData.val().length <= 3" },
+          "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9999" },
+          "exp": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "coins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "$other": { ".validate": false }
+        },
+        "statistics": {
+          ".validate": "newData.isObject()",
+          "highScore": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "bestDistance": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "gamesPlayed": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "losses": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "$other": { ".validate": false }
+        },
+        "score": {
+          ".validate": "newData.isObject()",
+          "bestScore": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "bestDistance": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "timestamp": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+        "achievements": { ".validate": "newData.isObject()" },
+        "settings": { ".validate": "newData.isObject()" },
+        "$other": { ".validate": false }
+      }
     }
   }
 }

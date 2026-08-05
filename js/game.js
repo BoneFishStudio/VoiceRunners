@@ -3280,6 +3280,10 @@ function toggleMusic() { Game.toggleMusic(); }
 function saveScoreAndRestart() { Game.saveScoreAndRestart(); }
 
 function startGame() {
+    // Blokir main jika akun email belum diverifikasi (kebijakan produksi)
+    if (typeof checkEmailVerifiedBeforePlay === 'function' && !checkEmailVerifiedBeforePlay()) {
+        return;
+    }
     document.getElementById('mainMenu').classList.remove('active');
     document.getElementById('loadingScreen').classList.add('active');
     
@@ -3292,6 +3296,21 @@ function startGame() {
         document.getElementById('modeSelect').classList.add('active');
         Game.state = 'modeSelect';
     }, 2000);
+}
+
+// Cek kebijakan: akun email yang belum diverifikasi TIDAK boleh main.
+// Guest (anonim) tetap boleh main.
+function checkEmailVerifiedBeforePlay() {
+    const u = window.AuthService ? window.AuthService.getUser() : null;
+    if (u && !u.isAnonymous && u.email && !u.emailVerified) {
+        if (typeof showVerificationScreen === 'function') {
+            showVerificationScreen(u);
+        } else {
+            alert('Verifikasi email kamu dulu sebelum bermain. Cek inbox!');
+        }
+        return false;
+    }
+    return true;
 }
 
 function showMainMenu() {
@@ -3328,6 +3347,9 @@ function showModeSelect() {
 }
 
 function startSolo() {
+    if (typeof checkEmailVerifiedBeforePlay === 'function' && !checkEmailVerifiedBeforePlay()) {
+        return;
+    }
     document.getElementById('modeSelect').classList.remove('active');
     Game.startSolo();
 }
