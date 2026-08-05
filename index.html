@@ -366,12 +366,28 @@
         </div>
     </div>
 
+    <!-- ========== EMAIL VERIFICATION (blokir main sampai diverifikasi) ========== -->
+    <div id="verificationScreen" class="screen">
+        <div class="auth-container">
+            <h2><svg class="title-icon"><use href="#icon-mail"/></svg> VERIFIKASI EMAIL</h2>
+            <div class="verify-icon"><svg><use href="#icon-mail"/></svg></div>
+            <p class="auth-hint">Kami sudah mengirim tautan verifikasi ke <strong id="verifyEmail">email kamu</strong>.<br>Klik tautan di email, lalu tekan tombol di bawah.</p>
+            <div class="verify-actions">
+                <button class="menu-btn primary" onclick="resendVerificationEmail()"><svg class="btn-icon"><use href="#icon-mail"/></svg> KIRIM ULANG EMAIL</button>
+                <button class="menu-btn" onclick="checkVerificationStatus()"><svg class="btn-icon"><use href="#icon-refresh"/></svg> SAYA SUDAH VERIFIKASI</button>
+                <button class="menu-btn" onclick="switchAuthTab('forgot')"><svg class="btn-icon"><use href="#icon-settings"/></svg> GANTI EMAIL</button>
+            </div>
+            <div id="verifyMsg" class="mp-status" style="display:none;"></div>
+            <button class="back-btn" onclick="logoutAndGuest()"><svg class="btn-icon"><use href="#icon-logout"/></svg> KELUAR (LANJUT SEBAGAI GUEST)</button>
+        </div>
+    </div>
+
     <!-- ========== PROFILE (LOGIN / DAFTAR / LUPA PASSWORD) ========== -->
     <div id="authScreen" class="screen">
         <div class="auth-container">
             <h2><svg class="title-icon"><use href="#icon-user"/></svg> PROFILE</h2>
 
-            <!-- ===== KARTU PROFIL (statis, lengkap) ===== -->
+            <!-- ===== KARTU PROFIL ===== -->
             <div class="profile-card">
                 <div class="profile-avatar" id="profileAvatar"><svg><use href="#icon-user"/></svg></div>
                 <div class="profile-meta">
@@ -379,6 +395,8 @@
                     <div class="profile-email" id="profileEmail">Belum masuk</div>
                     <span class="profile-badge" id="profileBadge">GUEST</span>
                 </div>
+                <button class="avatar-edit-btn" id="avatarEditBtn" onclick="openPhotoPicker()" title="Ubah foto profil" style="display:none;"><svg class="btn-icon"><use href="#icon-settings"/></svg></button>
+                <input type="file" id="photoInput" accept="image/*" style="display:none;">
             </div>
 
             <!-- ===== STATISTIK (dari localStorage) ===== -->
@@ -419,7 +437,7 @@
                 <div class="account-form">
                     <input type="text" id="authName" placeholder="Nama tampilan (maks 20)" maxlength="20" autocomplete="nickname">
                     <input type="email" id="authEmailReg" placeholder="Email" maxlength="64" autocomplete="email">
-                    <input type="password" id="authPasswordReg" placeholder="Password (min 6 karakter)" maxlength="64" autocomplete="new-password">
+                    <input type="password" id="authPasswordReg" placeholder="Password (min 8, huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
                     <input type="password" id="authPasswordReg2" placeholder="Ulangi password" maxlength="64" autocomplete="new-password">
                     <button class="menu-btn primary" onclick="submitRegister()"><svg class="btn-icon"><use href="#icon-check"/></svg> DAFTAR AKUN</button>
                 </div>
@@ -438,7 +456,57 @@
             <div class="auth-panel" id="authPanelLoggedIn" style="display:none;">
                 <p class="auth-hint" id="authLoggedInInfo">Kamu sudah masuk sebagai akun permanen.</p>
                 <button class="menu-btn" onclick="switchAuthTab('forgot')"><svg class="btn-icon"><use href="#icon-mail"/></svg> RESET PASSWORD</button>
+                <button class="menu-btn" onclick="toggleProfileEdit()"><svg class="btn-icon"><use href="#icon-settings"/></svg> EDIT PROFIL</button>
                 <button class="menu-btn exit" onclick="logoutAccount()"><svg class="btn-icon"><use href="#icon-logout"/></svg> KELUAR</button>
+            </div>
+
+            <!-- ===== INFO AKUN LENGKAP (hanya untuk akun permanen) ===== -->
+            <div class="auth-panel" id="authPanelAccountInfo" style="display:none;">
+                <div class="profile-details">
+                    <div class="profile-detail-row"><span class="pd-label">USERNAME</span><span class="pd-value" id="pdUsername">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">EMAIL</span><span class="pd-value" id="pdEmail">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">VERIFIKASI</span><span class="pd-value" id="pdVerified">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">UID</span><span class="pd-value pd-mono" id="pdUid">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">AKUN DIBUAT</span><span class="pd-value" id="pdCreated">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">LOGIN TERAKHIR</span><span class="pd-value" id="pdLastLogin">-</span></div>
+                    <div class="profile-detail-row"><span class="pd-label">PROVIDER</span><span class="pd-value" id="pdProvider">-</span></div>
+                </div>
+
+                <!-- EDIT PROFIL -->
+                <div id="profileEditBox" style="display:none;">
+                    <div class="account-form">
+                        <label class="pd-label">Nama Tampilan</label>
+                        <input type="text" id="editDisplayName" placeholder="Nama tampilan" maxlength="20">
+                        <button class="menu-btn primary" onclick="saveDisplayName()"><svg class="btn-icon"><use href="#icon-check"/></svg> SIMPAN NAMA</button>
+                    </div>
+                    <div class="account-form">
+                        <label class="pd-label">Foto Profil</label>
+                        <input type="file" id="editPhotoInput" accept="image/*" style="margin-bottom:0.6rem;">
+                        <button class="menu-btn primary" onclick="uploadProfilePhoto()"><svg class="btn-icon"><use href="#icon-user"/></svg> UPLOAD FOTO</button>
+                    </div>
+                </div>
+
+                <!-- GANTI PASSWORD -->
+                <div id="passwordChangeBox" class="account-form" style="margin-top:0.8rem;">
+                    <label class="pd-label">Ganti Password</label>
+                    <input type="password" id="chgCurrentPassword" placeholder="Password saat ini" maxlength="64" autocomplete="current-password">
+                    <input type="password" id="chgNewPassword" placeholder="Password baru (min 8, ada huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
+                    <input type="password" id="chgConfirmPassword" placeholder="Ulangi password baru" maxlength="64" autocomplete="new-password">
+                    <button class="menu-btn primary" onclick="changeMyPassword()"><svg class="btn-icon"><use href="#icon-lock"/></svg> GANTI PASSWORD</button>
+                    <div id="pwdMsg" class="mp-status" style="display:none;"></div>
+                </div>
+
+                <!-- DELETE ACCOUNT -->
+                <button class="menu-btn exit" style="margin-top:0.8rem;" onclick="requestDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> HAPUS AKUN</button>
+                <div id="deleteConfirmBox" class="account-form" style="display:none;margin-top:0.6rem;">
+                    <p class="auth-hint" style="margin-bottom:0.5rem;text-align:left;">Masukkan password untuk konfirmasi penghapusan akun. Aksi ini tidak bisa dibatalkan.</p>
+                    <input type="password" id="deletePassword" placeholder="Password" maxlength="64" autocomplete="current-password">
+                    <button class="menu-btn exit" onclick="confirmDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> YA, HAPUS AKUN SAYA</button>
+                    <button class="menu-btn" onclick="cancelDeleteAccount()">BATAL</button>
+                    <div id="deleteMsg" class="mp-status" style="display:none;"></div>
+                </div>
+
+                <div id="accountInfoMsg" class="mp-status" style="display:none;"></div>
             </div>
 
             <!-- ===== MODERASI (khusus admin/moderator — tampil otomatis) ===== -->
@@ -603,15 +671,29 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (app + auth + database) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- Firebase SDK v10 Compat (app + auth + database + storage) -->
+    <!-- Compat: API sama dengan v8 (firebase.auth()/database()/storage()), tetap aman di Electron file:// -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+    <!-- Auth Services (modular, terpisah per domain) -->
+    <script src="js/auth/firebase.js"></script>
+    <script src="js/auth/validation.js"></script>
+    <script src="js/auth/toast.js"></script>
+    <script src="js/auth/profileService.js"></script>
+    <script src="js/auth/databaseService.js"></script>
+    <script src="js/auth/storageService.js"></script>
+    <script src="js/auth/authService.js"></script>
 
     <!-- Game Scripts -->
     <script src="js/audio.js"></script>
     <script src="js/multiplayer.js"></script>
     <script src="js/game.js"></script>
+
+    <!-- Auth entry: init Firebase + AuthService + bridge -->
+    <script src="js/auth/main.js"></script>
 
     <!-- Register Service Worker (PWA) — hanya di http(s), bukan file:// (Electron) -->
     <script>

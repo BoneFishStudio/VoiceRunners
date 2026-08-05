@@ -2209,6 +2209,207 @@ body::-webkit-scrollbar {
 }
 
 /* ==================================================================
+   AUTH SERVICES UI — Toast, Loading, Skeleton, Verify, Profile details
+   ================================================================== */
+
+/* ----- Toast ----- */
+.toast-container {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    pointer-events: none;
+    width: min(92vw, 420px);
+}
+
+.toast {
+    width: 100%;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    animation: toastIn 0.3s ease-out;
+    pointer-events: auto;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.toast-success { background: linear-gradient(135deg, #1a8f4a, #28c26b); }
+.toast-error   { background: linear-gradient(135deg, #b3261e, #e5484d); }
+.toast-info    { background: linear-gradient(135deg, #1b6bd6, #4bb8ff); }
+
+.toast-out {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: all 0.3s ease;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- Loading overlay ----- */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(8,10,16,0.85);
+    backdrop-filter: blur(3px);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.loading-overlay.active { display: flex; }
+
+.loading-spinner {
+    width: 44px;
+    height: 44px;
+    border: 4px solid rgba(75,184,255,0.2);
+    border-top-color: #4bb8ff;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-msg {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.65rem;
+    color: var(--text);
+    letter-spacing: 1px;
+}
+
+/* ----- Skeleton ----- */
+.skeleton-row {
+    padding: 10px 0;
+}
+
+.skeleton-block {
+    height: 18px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ----- Verify screen ----- */
+.verify-icon {
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: 0 auto 1rem;
+    color: #4bb8ff;
+}
+
+.verify-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: pulse 1.8s infinite;
+}
+
+.verify-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 0.8rem;
+}
+
+.verify-actions .menu-btn { width: 100%; justify-content: center; }
+
+/* ----- Profile details ----- */
+.profile-details {
+    text-align: left;
+    margin-bottom: 0.8rem;
+}
+
+.profile-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.55rem 0.2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.pd-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.pd-value {
+    font-size: 0.82rem;
+    color: var(--text);
+    text-align: right;
+    word-break: break-all;
+}
+
+.pd-mono {
+    font-family: monospace;
+    font-size: 0.7rem;
+    opacity: 0.85;
+}
+
+.pd-ok   { color: var(--success); }
+.pd-warn { color: #ffaa00; }
+
+.profile-avatar-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-edit-btn {
+    position: absolute;
+    right: -0.4rem;
+    top: -0.4rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.25s;
+}
+
+.avatar-edit-btn:hover {
+    color: var(--text);
+    border-color: var(--text);
+}
+
+.profile-card {
+    position: relative;
+}
+
+/* ==================================================================
    RESPONSIVE OVERHAUL — semua ukuran layar (320px → desktop)
    ================================================================== */
 
