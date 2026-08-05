@@ -499,40 +499,33 @@ async function fetchRole(uid) {
     return fallback;
 }
 
+// Sinkronkan variabel global lama (authUser/authUid/authReady/cachedRole)
+// dari state AuthService — dipanggil oleh main.js setiap state auth berubah,
+// supaya game.js & fungsi multiplayer lain yang membaca variabel ini selalu akurat
+// (bahkan sebelum Multiplayer.init() dipanggil).
+function syncAuthGlobals(s) {
+    if (!s) return;
+    authUser = s.user;
+    authUid = s.uid;
+    authReady = s.ready;
+    cachedRole = s.role;
+}
+
+// Auth init didelegasikan ke AuthService (js/auth/authService.js).
+// Fungsi ini dipertahankan supaya panggilan lama (Multiplayer.init) tetap aman.
 async function initFirebaseAuth() {
     if (!fbInitialized) return;
     try {
         if (typeof firebase.auth !== 'function') {
-            console.warn('firebase-auth.js tidak dimuat — global leaderboard nonaktif');
+            console.warn('firebase-auth.js tidak dimuat — auth nonaktif');
             return;
         }
-        // onAuthStateChanged: kepakai juga saat upgrade Guest→akun permanen atau login/logout,
-        // jadi UID + role otomatis di-refresh tanpa reload halaman.
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                // ⚠️ Guard race: kalau ada callback lama yang selesai lebih lambat
-                // (misal upgrade Guest→email), jangan timpa state dengan user basi.
-                if (firebase.auth().currentUser !== user) return;
-                authUser = user;
-                authUid = user.uid;
-                authReady = true;
-                cachedRole = await fetchRole(user.uid);
-                // Cek lagi setelah await — user bisa berubah saat fetchRole berjalan
-                if (firebase.auth().currentUser !== user) return;
-                try { localStorage.setItem('voiceRunner_userRole', cachedRole); } catch(e) {}
-                console.log('✅ Auth:', user.isAnonymous ? 'anonim' : 'email', '| role:', cachedRole);
-                // Flush skor yang sempat di-antri sebelum auth siap
-                await flushPendingGlobalScores();
-                if (typeof refreshAccountUI === 'function') refreshAccountUI();
-            } else {
-                // Belum ada sesi → sign-in anonim otomatis (Guest)
-                try {
-                    await firebase.auth().signInAnonymously();
-                } catch(e) {
-                    console.warn('Anonymous auth gagal:', e.message);
-                }
-            }
-        });
+        if (window.AuthService && !window.AuthService.state.ready) {
+            window.AuthService.init();
+        }
+        if (window.AuthService) {
+            syncAuthGlobals(window.AuthService.getState());
+        }
     } catch(e) {
         console.warn('Auth init error:', e.message);
     }
@@ -559,76 +552,29 @@ function isAuthReady() { return authReady; }
 function getUserRole() { return cachedRole; }
 function isCurrentUserMod() { return cachedRole === 'admin' || cachedRole === 'moderator'; }
 
-// Simpan skor terbaik ke /leaderboard/{uid} (best-effort, tidak mengganggu game).
-// Kalau auth/Firebase gagal → return false, skor tetap aman di localStorage.
+// Simpan skor terbaik ke /leaderboard/{uid} — didelegasikan ke DatabaseService.
+// Best-effort; kalau auth belum siap, skor diantri dan di-flush begitu auth sukses.
 async function saveGlobalLeaderboard(name, score, distance) {
     if (!fbInitialized) { init(); }
     if (!fbInitialized || !authReady || !authUid || !database) {
-        // Auth belum siap → antri dulu, akan di-flush begitu auth sukses.
-        // Skor lokal tetap tersimpan terlepas dari apa pun.
         if (fbInitialized) {
             _pendingGlobalScores.push({ name: name, score: score, distance: distance });
         }
         return false;
     }
     try {
-        const ref = database.ref('leaderboard/' + authUid);
-        const snap = await ref.once('value');
-        const existing = snap.val();
-        // Simpan yang TERBAIK per user (jangan menimpa skor lebih tinggi)
-        if (existing && typeof existing.score === 'number' && existing.score >= score) {
-            return false;
-        }
-        // Tandai Guest (anonim) + timestamp submit buat anti-cheat rate limit di rules.
-        const isGuest = !!(authUser && authUser.isAnonymous);
-        await ref.set({
-            name: String(name || 'Anonim').slice(0, 20),
-            score: Math.floor(score) || 0,
-            distance: Math.floor(distance) || 0,
-            timestamp: Date.now(),
-            lastSubmitTimestamp: Date.now(),
-            isGuest: isGuest
-        });
-        console.log('🌍 Skor global tersimpan:', score);
-        return true;
+        const ok = await window.DatabaseService.saveScore(name, score, distance);
+        if (ok) console.log('Skor global tersimpan:', score);
+        return ok;
     } catch(e) {
         console.warn('Save global leaderboard gagal:', e.message);
         return false;
     }
 }
 
-// Ambil top N skor global dari Firebase (sorted by score desc).
+// Ambil top N skor global — didelegasikan ke DatabaseService.
 function loadGlobalLeaderboard(limit) {
-    return new Promise((resolve) => {
-        if (!fbInitialized) { init(); }
-        if (!fbInitialized || !database) { resolve([]); return; }
-        const count = limit || 50;
-        database.ref('leaderboard')
-            .orderByChild('score')
-            .limitToLast(count)
-            .once('value')
-            .then((snap) => {
-                const entries = [];
-                snap.forEach((child) => {
-                    const v = child.val();
-                    if (v && typeof v.score === 'number') {
-                        entries.push({
-                            uid: child.key,
-                            name: v.name,
-                            score: v.score,
-                            distance: v.distance || 0,
-                            timestamp: v.timestamp || 0
-                        });
-                    }
-                });
-                entries.sort((a, b) => b.score - a.score);
-                resolve(entries);
-            })
-            .catch((err) => {
-                console.warn('Load global leaderboard gagal:', err);
-                resolve([]);
-            });
-    });
+    return window.DatabaseService.loadTop(limit || 50);
 }
 
 // ============================================================
@@ -639,35 +585,15 @@ function loadGlobalLeaderboard(limit) {
 // - Hanya ADMIN yang bisa mengubah role siapa pun (di-enforce juga di Security Rules)
 // - Bootstrap admin pertama dilakukan MANUAL di Firebase Console (lihat README/docs)
 
-// Terjemahkan pesan error Firebase Auth ke Bahasa Indonesia yang ramah user
+// Terjemahkan error Firebase → pesan ramah (didelegasikan ke Validation)
 function friendlyAuthError(codeOrMsg) {
-    const m = String(codeOrMsg || '');
-    // Urutan penting: cek kode spesifik dulu sebelum generic
-    if (m.indexOf('operation-not-allowed') !== -1 || m.indexOf('OPERATION_NOT_ALLOWED') !== -1) {
-        return 'Login Email/Password belum diaktifkan di Firebase Console (Authentication → Sign-in method → Email/Password → Aktifkan). Setelah diaktifkan, coba lagi.';
-    }
-    if (m.indexOf('invalid-login-credentials') !== -1 || m.indexOf('INVALID_LOGIN_CREDENTIALS') !== -1) return 'Email atau password salah.';
-    if (m.indexOf('invalid-credential') !== -1) return 'Email atau password salah.';
-    if (m.indexOf('email-already-in-use') !== -1) return 'Email sudah terdaftar. Gunakan tombol MASUK.';
-    if (m.indexOf('credential-already-in-use') !== -1) return 'Email ini sudah terhubung ke akun lain.';
-    if (m.indexOf('account-exists-with-different-credential') !== -1) return 'Email ini sudah dipakai akun lain.';
-    if (m.indexOf('invalid-email') !== -1) return 'Format email tidak valid.';
-    if (m.indexOf('weak-password') !== -1) return 'Password terlalu lemah (minimal 6 karakter).';
-    if (m.indexOf('wrong-password') !== -1) return 'Password salah.';
-    if (m.indexOf('user-not-found') !== -1 || m.indexOf('email-not-found') !== -1) return 'Akun tidak ditemukan. Periksa email atau daftar dulu.';
-    if (m.indexOf('too-many-requests') !== -1 || m.indexOf('too-many-attempts') !== -1) return 'Terlalu banyak percobaan. Coba lagi beberapa saat.';
-    if (m.indexOf('requires-recent-login') !== -1) return 'Sesi sudah lama. Keluar lalu masuk lagi, lalu ulangi.';
-    if (m.indexOf('network') !== -1 || m.indexOf('unavailable') !== -1) return 'Koneksi internet bermasalah. Coba lagi.';
-    return m;
+    return (window.Validation || {}).friendlyAuthError ? window.Validation.friendlyAuthError(codeOrMsg) : String(codeOrMsg || '');
 }
 
-// Deteksi apakah provider Email/Password sudah diaktifkan di project Firebase.
-// Dipanggil sekali pas halaman PROFILE dibuka — kalau nonaktif, tampilkan peringatan
-// yang jelas (ini sumber utama error 400 saat daftar/masuk).
+// Deteksi apakah provider Email/Password aktif (didelegasikan — tampilkan peringatan di PROFILE)
 async function checkEmailProviderEnabled() {
     try {
-        const result = await firebase.auth().fetchSignInMethodsForEmail('provider-check@example.com');
-        // Sukses (array kosong/berisi) = provider aktif
+        await firebase.auth().fetchSignInMethodsForEmail('provider-check@example.com');
         const el = document.getElementById('authStatus');
         if (el && el.dataset.providerWarn) delete el.dataset.providerWarn;
         return true;
@@ -677,11 +603,10 @@ async function checkEmailProviderEnabled() {
             const el = document.getElementById('authStatus');
             if (el && !el.dataset.providerWarn) {
                 el.dataset.providerWarn = '1';
-                el.innerHTML = '⚠️ <b>Login Email/Password belum diaktifkan.</b> Buka Firebase Console → Authentication → Sign-in method → aktifkan <b>Email/Password</b>, lalu muat ulang halaman ini.';
+                el.innerHTML = '<b>Login Email/Password belum diaktifkan.</b> Buka Firebase Console → Authentication → Sign-in method → aktifkan <b>Email/Password</b>, lalu muat ulang halaman ini.';
             }
             return false;
         }
-        // Error lain (misal network) — bukan soal provider, biarkan normal
         return true;
     }
 }
@@ -694,75 +619,44 @@ function showStatusEl(el, msg, type) {
     setTimeout(() => { if (el.textContent === msg) el.style.display = 'none'; }, 6000);
 }
 
-// ===== UPGRADE GUEST → AKUN PERMANEN (linkWithCredential) =====
-// Guest yang sudah punya skor "naik level" jadi user tanpa kehilangan apa pun:
-// UID berubah otomatis oleh Firebase & skor lama tetap mengikuti via anonymous auth.
+// ===== DELEGASI KE AUTHSERVICE (js/auth/authService.js) =====
+// Semua operasi auth inti dipindah ke AuthService (register dengan
+// createUserWithEmailAndPassword + updateProfile + email verifikasi,
+// login dengan cek verifikasi, logout, delete, ganti password, dll).
+
 async function registerOrLinkAccount(email, password, name) {
+    if (!window.AuthService) return { ok: false, msg: 'AuthService belum siap.' };
     if (!authReady || !authUser || !database) return { ok: false, msg: 'Koneksi/auth belum siap. Coba lagi sebentar.' };
-    try {
-        const user = firebase.auth().currentUser;
-        if (user && user.isAnonymous) {
-            // 🔁 Guest → upgrade ke akun email permanen (progress & UID lama ditautkan)
-            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
-            await user.linkWithCredential(cred);
-            if (name) {
-                try { await user.updateProfile({ displayName: String(name).slice(0, 20) }); } catch(e) {}
-            }
-            return { ok: true, upgraded: true };
-        }
-        // Sudah user email — daftar akun baru terpisah
-        const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
-        if (name) {
-            try { await cred.user.updateProfile({ displayName: String(name).slice(0, 20) }); } catch(e) {}
-        }
-        return { ok: true, upgraded: false };
-    } catch(e) {
-        // Log kode error asli biar gampang didiagnosa (misal auth/operation-not-allowed)
-        console.error('⚠️ Auth register error — code:', e.code || '(no code)', '| msg:', e.message);
-        return { ok: false, msg: e.message };
-    }
+    return window.AuthService.register(name, email, password);
 }
 
 async function loginEmailAccount(email, password) {
-    try {
-        await firebase.auth().signInWithEmailAndPassword(email, password);
-        return { ok: true };
-    } catch(e) {
-        return { ok: false, msg: e.message };
-    }
+    if (!window.AuthService) return { ok: false, msg: 'AuthService belum siap.' };
+    return window.AuthService.login(email, password);
 }
 
 async function logoutAccount() {
-    try {
-        await firebase.auth().signOut();
-    } catch(e) {}
-    // onAuthStateChanged akan otomatis sign-in anonim lagi (jadi Guest)
+    if (window.AuthService) {
+        await window.AuthService.logout();
+    } else {
+        try { await firebase.auth().signOut(); } catch(e) {}
+    }
+    // onAuthStateChanged (AuthService) akan otomatis sign-in anonim lagi (Guest)
     refreshAccountUI();
 }
 
 // ===== MODERASI (hanya admin/moderator — di-enforce juga di Security Rules) =====
-// Admin: assign/cabut role user mana pun.
+// Admin: assign/cabut role user mana pun (delegasi ke DatabaseService).
 async function assignUserRole(uid, role) {
     if (!authReady || !authUid || !database) return { ok: false, msg: 'Koneksi/auth belum siap.' };
     if (['admin', 'moderator', 'user', 'anon'].indexOf(role) === -1) return { ok: false, msg: 'Role tidak valid.' };
-    if (!uid) return { ok: false, msg: 'UID kosong.' };
-    try {
-        await database.ref('userRoles/' + uid).set(role);
-        return { ok: true };
-    } catch(e) {
-        return { ok: false, msg: e.message };
-    }
+    return window.DatabaseService.setUserRole(uid, role);
 }
 
-// Moderator/Admin: hapus entry leaderboard yang dicurigai curang.
+// Moderator/Admin: hapus entry leaderboard (delegasi ke DatabaseService).
 async function removeGlobalEntry(uid) {
     if (!authReady || !authUid || !database) return { ok: false, msg: 'Koneksi/auth belum siap.' };
-    try {
-        await database.ref('leaderboard/' + uid).remove();
-        return { ok: true };
-    } catch(e) {
-        return { ok: false, msg: e.message };
-    }
+    return window.DatabaseService.removeEntry(uid);
 }
 
 // Dipanggil dari tombol 🗑 di leaderboard global (hanya tampil utk admin/moderator)
@@ -835,17 +729,37 @@ function refreshAccountUI() {
         badgeEl.className = 'profile-badge ' + badgeColor;
     }
     if (avatarEl) {
-        // Avatar: inisial nama (atau huruf G untuk Guest)
-        let initial = '?';
-        if (authUser && !authUser.isAnonymous) {
-            const label = (authUser.displayName || authUser.email || 'U').trim();
-            initial = label.charAt(0).toUpperCase();
-        } else if (authUser && authUser.isAnonymous) {
-            initial = 'G';
+        const photoURL = authUser && authUser.photoURL;
+        if (photoURL) {
+            // Foto profil dari Storage (atau provider)
+            avatarEl.innerHTML = '';
+            avatarEl.classList.remove('has-initial');
+            const img = document.createElement('img');
+            img.src = photoURL;
+            img.alt = 'Foto profil';
+            img.className = 'profile-avatar-img';
+            img.onerror = function () { avatarEl.textContent = '?' ; };
+            avatarEl.appendChild(img);
+        } else {
+            // Avatar: inisial nama (atau huruf G untuk Guest)
+            let initial = '?';
+            if (authUser && !authUser.isAnonymous) {
+                const label = (authUser.displayName || authUser.email || 'U').trim();
+                initial = label.charAt(0).toUpperCase();
+            } else if (authUser && authUser.isAnonymous) {
+                initial = 'G';
+            }
+            avatarEl.textContent = initial;
+            avatarEl.classList.add('has-initial');
         }
-        avatarEl.textContent = initial;
-        avatarEl.classList.add('has-initial');
     }
+
+    // Tombol ubah foto hanya untuk akun permanen
+    const avatarEditBtn = document.getElementById('avatarEditBtn');
+    if (avatarEditBtn) avatarEditBtn.style.display = (authUser && !authUser.isAnonymous) ? 'flex' : 'none';
+
+    // Isi detail akun lengkap (panel akun permanen)
+    fillAccountDetails();
 
     // Moderasi: tampil hanya utk admin/moderator; panel set-role khusus admin
     const modSection = document.getElementById('moderationSection');
@@ -860,26 +774,57 @@ function refreshAccountUI() {
     if (typeof updateProfileLoggedInPanel === 'function') updateProfileLoggedInPanel();
 }
 
+// Isi detail akun lengkap (UID, tanggal buat, login terakhir, provider, verifikasi)
+function fillAccountDetails() {
+    const u = authUser;
+    const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    if (!u) return;
+
+    set('pdUsername', u.displayName || '-');
+    set('pdEmail', u.email || '-');
+    set('pdVerified', u.emailVerified ? '✓ Terverifikasi' : '✗ Belum verifikasi');
+    set('pdUid', u.uid || '-');
+    set('pdCreated', u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime).toLocaleDateString('id-ID') : '-');
+    set('pdLastLogin', u.metadata && u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime).toLocaleDateString('id-ID') : '-');
+
+    // Provider login (dari providerData)
+    const providers = (u.providerData || []).map(p => p.providerId);
+    let providerLabel = providers.join(', ') || 'password';
+    if (providerLabel.indexOf('google.com') !== -1) providerLabel = 'Google';
+    else if (providerLabel.indexOf('password') !== -1) providerLabel = 'Email/Password';
+    else if (providerLabel.indexOf('anonymous') !== -1) providerLabel = 'Anonymous';
+    set('pdProvider', providerLabel);
+
+    const pvEl = document.getElementById('pdVerified');
+    if (pvEl) pvEl.className = 'pd-value ' + (u.emailVerified ? 'pd-ok' : 'pd-warn');
+}
+
 // Update halaman PROFILE: kalau sudah login permanen, sembunyikan form login/daftar,
 // tampilkan panel "KELUAR" (reset password + logout).
 function updateProfileLoggedInPanel() {
     const loggedInPanel = document.getElementById('authPanelLoggedIn');
+    const accountInfoPanel = document.getElementById('authPanelAccountInfo');
     const tabs = document.querySelector('.auth-tabs');
     if (!loggedInPanel) return;
     const isPermanent = authUser && !authUser.isAnonymous;
     if (isPermanent) {
-        // Sembunyikan SEMUA panel auth (login/daftar/lupa password) — bukan cuma tabs,
-        // karena panel-panel itu sibling dari tabs, bukan child.
+        // Sembunyikan SEMUA panel auth (login/daftar/lupa password)
         ['authPanelLogin', 'authPanelRegister', 'authPanelForgot'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
         loggedInPanel.style.display = 'block';
+        if (accountInfoPanel) accountInfoPanel.style.display = 'block';
         if (tabs) tabs.style.display = 'none';
         const info = document.getElementById('authLoggedInInfo');
         if (info) info.textContent = 'Masuk sebagai ' + (authUser.email || authUser.displayName || 'akun');
+        if (typeof fillAccountDetails === 'function') fillAccountDetails();
     } else {
         loggedInPanel.style.display = 'none';
+        if (accountInfoPanel) accountInfoPanel.style.display = 'none';
         if (tabs) tabs.style.display = 'flex';
         const active = document.querySelector('.auth-tab.active');
         const tab = active && active.id === 'authTabRegister' ? 'register' : 'login';
@@ -947,15 +892,21 @@ function authMsg(msg, type) {
 async function submitLogin() {
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
-    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
-    if (!password) { authMsg('❌ Password wajib diisi.', 'error'); return; }
+    if (!isValidEmail(email)) { authMsg('Format email tidak valid.', 'error'); return; }
+    if (!password) { authMsg('Password wajib diisi.', 'error'); return; }
     const res = await loginEmailAccount(email, password);
+    if (res.ok && res.needsVerification) {
+        // Email belum diverifikasi → tampilkan screen verifikasi (blokir main)
+        showVerificationScreen(res.user);
+        return;
+    }
     if (res.ok) {
-        authMsg('✅ Berhasil masuk! Skor akunmu tampil di leaderboard global.', 'success');
+        authMsg('Berhasil masuk! Skor akunmu tampil di leaderboard global.', 'success');
         refreshAuthStatus();
         if (typeof refreshAccountUI === 'function') refreshAccountUI();
+        if (window.Toast) window.Toast.success('Selamat datang kembali!');
     } else {
-        authMsg('❌ ' + friendlyAuthError(res.msg), 'error');
+        authMsg(friendlyAuthError(res.msg), 'error');
     }
 }
 
@@ -966,41 +917,180 @@ async function submitRegister() {
     const password2 = document.getElementById('authPasswordReg2').value;
     // Kalau sudah masuk sebagai akun permanen, jangan buat akun kedua secara diam-diam
     if (authUser && !authUser.isAnonymous) {
-        authMsg('ℹ️ Kamu sudah masuk sebagai akun permanen (' + escapeHtml(authUser.email || '') + '). Keluar dulu untuk mendaftar akun baru.', 'info');
+        authMsg('Kamu sudah masuk sebagai akun permanen (' + escapeHtml(authUser.email || '') + '). Keluar dulu untuk mendaftar akun baru.', 'info');
         return;
     }
-    if (!name) { authMsg('❌ Nama tampilan wajib diisi.', 'error'); return; }
-    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
-    if (password.length < 6) { authMsg('❌ Password minimal 6 karakter.', 'error'); return; }
-    if (password !== password2) { authMsg('❌ Konfirmasi password tidak cocok.', 'error'); return; }
+    if (!name) { authMsg('Nama tampilan wajib diisi.', 'error'); return; }
+    if (!isValidEmail(email)) { authMsg('Format email tidak valid.', 'error'); return; }
+    // Password kuat: min 8, huruf besar, huruf kecil, angka
+    const pwCheck = window.Validation.validatePasswordStrength(password);
+    if (!pwCheck.ok) {
+        authMsg('Password harus ' + pwCheck.errors.join(', ') + '.', 'error');
+        return;
+    }
+    if (password !== password2) { authMsg('Konfirmasi password tidak cocok.', 'error'); return; }
     const res = await registerOrLinkAccount(email, password, name);
     if (res.ok) {
         authMsg(res.upgraded
-            ? '✅ Akun berhasil dibuat! Skor Guest-mu tetap tersimpan & kini tersinkron antar device.'
-            : '✅ Akun berhasil didaftarkan!', 'success');
-        // Kirim email verifikasi (opsional — banyak game tidak wajib)
-        try {
-            const u = firebase.auth().currentUser;
-            if (u && !u.emailVerified) {
-                u.sendEmailVerification().catch(() => {});
-            }
-        } catch(e) {}
-        refreshAuthStatus();
-        if (typeof refreshAccountUI === 'function') refreshAccountUI();
+            ? 'Akun berhasil dibuat! Skor Guest-mu tetap tersimpan & kini tersinkron antar device.'
+            : 'Akun berhasil didaftarkan!', 'success');
+        if (window.Toast) window.Toast.success('Akun dibuat! Cek email untuk verifikasi.');
+        // Email verifikasi WAJIB — tampilkan screen verifikasi
+        showVerificationScreen(res.user);
     } else {
-        authMsg('❌ ' + friendlyAuthError(res.msg), 'error');
+        authMsg(friendlyAuthError(res.msg), 'error');
+    }
+}
+
+// ===== EMAIL VERIFICATION SCREEN =====
+async function showVerificationScreen(user) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('verificationScreen').classList.add('active');
+    const emailEl = document.getElementById('verifyEmail');
+    const u = user || (firebase.auth() && firebase.auth().currentUser);
+    if (emailEl && u) emailEl.textContent = u.email || 'email kamu';
+    if (window.AuthService) window.AuthService.state.emailBlocked = true;
+}
+
+async function resendVerificationEmail() {
+    const msgEl = document.getElementById('verifyMsg');
+    const res = await window.AuthService.resendVerification();
+    if (res.ok) {
+        showStatusEl(msgEl, 'Email verifikasi terkirim ulang. Cek inbox (termasuk spam)!', 'success');
+    } else {
+        showStatusEl(msgEl, friendlyAuthError(res.msg), 'error');
+    }
+}
+
+async function checkVerificationStatus() {
+    const msgEl = document.getElementById('verifyMsg');
+    const res = await window.AuthService.refreshVerificationStatus();
+    if (res.verified) {
+        showStatusEl(msgEl, 'Email terverifikasi! Menuju main menu...', 'success');
+        setTimeout(() => {
+            document.getElementById('verificationScreen').classList.remove('active');
+            document.getElementById('mainMenu').classList.add('active');
+            if (window.Toast) window.Toast.success('Selamat datang! Akunmu aktif.');
+        }, 1200);
+    } else {
+        showStatusEl(msgEl, 'Belum terverifikasi. Cek email lalu coba lagi.', 'error');
+    }
+}
+
+async function logoutAndGuest() {
+    // Keluar dari akun email → lanjut sebagai Guest (boleh main)
+    await logoutAccount();
+    document.getElementById('verificationScreen').classList.remove('active');
+    document.getElementById('mainMenu').classList.add('active');
+}
+
+// ===== EDIT PROFIL (nama + foto) =====
+function toggleProfileEdit() {
+    const box = document.getElementById('profileEditBox');
+    if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    const editName = document.getElementById('editDisplayName');
+    if (editName && authUser) editName.value = authUser.displayName || '';
+}
+
+async function saveDisplayName() {
+    const input = document.getElementById('editDisplayName');
+    const name = (input ? input.value : '').trim();
+    const v = window.Validation.validateDisplayName(name);
+    if (!v.ok) { if (window.Toast) window.Toast.error(v.msg); return; }
+    const u = firebase.auth().currentUser;
+    if (!u) return;
+    try {
+        await u.updateProfile({ displayName: v.value });
+        // Simpan ke RTDB profile juga
+        if (window.ProfileService) window.ProfileService.updateProfile(u.uid, { displayName: v.value }).catch(() => {});
+        if (window.Toast) window.Toast.success('Nama diperbarui!');
+        refreshAccountUI();
+    } catch(e) {
+        if (window.Toast) window.Toast.error(friendlyAuthError(e.message));
+    }
+}
+
+function openPhotoPicker() {
+    const input = document.getElementById('photoInput');
+    if (input) input.click();
+}
+
+async function uploadProfilePhoto() {
+    const input = document.getElementById('photoInput') || document.getElementById('editPhotoInput');
+    const file = input && input.files && input.files[0];
+    if (!file) { if (window.Toast) window.Toast.error('Pilih file gambar dulu.'); return; }
+    const u = firebase.auth().currentUser;
+    if (!u || !window.StorageService) return;
+    if (window.Toast) window.Toast.loading('Mengupload foto...');
+    const res = await window.StorageService.uploadAvatar(file, u.uid);
+    window.Toast.hideLoading();
+    if (res.ok) {
+        try {
+            await u.updateProfile({ photoURL: res.url });
+        } catch(e) {}
+        if (window.ProfileService) window.ProfileService.updateProfile(u.uid, { photoURL: res.url }).catch(() => {});
+        if (window.Toast) window.Toast.success('Foto profil diperbarui!');
+        refreshAccountUI();
+    } else {
+        if (window.Toast) window.Toast.error(friendlyAuthError(res.msg));
+    }
+}
+
+// ===== GANTI PASSWORD =====
+async function changeMyPassword() {
+    const cur = document.getElementById('chgCurrentPassword').value;
+    const newPw = document.getElementById('chgNewPassword').value;
+    const confirmPw = document.getElementById('chgConfirmPassword').value;
+    const msgEl = document.getElementById('pwdMsg');
+    const pwCheck = window.Validation.validatePasswordStrength(newPw);
+    if (!pwCheck.ok) { showStatusEl(msgEl, 'Password baru harus ' + pwCheck.errors.join(', ') + '.', 'error'); return; }
+    if (newPw !== confirmPw) { showStatusEl(msgEl, 'Konfirmasi password tidak cocok.', 'error'); return; }
+    const res = await window.AuthService.changePassword(cur, newPw);
+    if (res.ok) {
+        showStatusEl(msgEl, 'Password berhasil diganti!', 'success');
+        ['chgCurrentPassword', 'chgNewPassword', 'chgConfirmPassword'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+    } else {
+        showStatusEl(msgEl, friendlyAuthError(res.msg), 'error');
+    }
+}
+
+// ===== DELETE ACCOUNT =====
+function requestDeleteAccount() {
+    document.getElementById('deleteConfirmBox').style.display = 'block';
+    document.getElementById('deletePassword').value = '';
+}
+function cancelDeleteAccount() {
+    document.getElementById('deleteConfirmBox').style.display = 'none';
+}
+async function confirmDeleteAccount() {
+    const password = document.getElementById('deletePassword').value;
+    const msgEl = document.getElementById('deleteMsg');
+    if (!window.AuthService) return;
+    if (window.Toast) window.Toast.loading('Menghapus akun...');
+    const res = await window.AuthService.deleteAccount(password);
+    window.Toast.hideLoading();
+    if (res.ok) {
+        if (window.Toast) window.Toast.success('Akun dihapus. Kamu kini Guest.');
+        setTimeout(() => {
+            document.getElementById('authScreen').classList.remove('active');
+            document.getElementById('mainMenu').classList.add('active');
+        }, 1000);
+    } else {
+        showStatusEl(msgEl, friendlyAuthError(res.msg), 'error');
     }
 }
 
 async function submitForgotPassword() {
     const email = document.getElementById('authEmailForgot').value.trim();
-    if (!isValidEmail(email)) { authMsg('❌ Format email tidak valid.', 'error'); return; }
-    try {
-        await firebase.auth().sendPasswordResetEmail(email);
-        // Pesan generic — jangan bocorkan apakah email itu terdaftar (anti user enumeration)
-        authMsg('📧 Kalau email ' + escapeHtml(email) + ' terdaftar, tautan reset sudah dikirim. Cek inbox (termasuk spam)!', 'success');
-    } catch(e) {
-        authMsg('📧 Kalau email ' + escapeHtml(email) + ' terdaftar, tautan reset sudah dikirim. Cek inbox (termasuk spam)!', 'success');
+    if (!isValidEmail(email)) { authMsg('Format email tidak valid.', 'error'); return; }
+    const res = await window.AuthService.forgotPassword(email);
+    // Pesan generic — jangan bocorkan apakah email itu terdaftar (anti user enumeration)
+    authMsg('Kalau email ' + escapeHtml(email) + ' terdaftar, tautan reset sudah dikirim. Cek inbox (termasuk spam)!', 'success');
+    if (res && res.msg && !res.ok) {
+        // Hanya tampilkan error yang benar-benar bukan soal enumerasi (mis. network)
+        authMsg(friendlyAuthError(res.msg), 'error');
     }
 }
 
