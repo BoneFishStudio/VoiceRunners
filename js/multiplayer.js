@@ -644,12 +644,13 @@ function friendlyAuthError(codeOrMsg) {
     const m = String(codeOrMsg || '');
     // Urutan penting: cek kode spesifik dulu sebelum generic
     if (m.indexOf('operation-not-allowed') !== -1 || m.indexOf('OPERATION_NOT_ALLOWED') !== -1) {
-        return 'Login Email/Password belum diaktifkan di Firebase Console (Authentication → Sign-in method). Aktifkan dulu, lalu coba lagi.';
+        return 'Login Email/Password belum diaktifkan di Firebase Console (Authentication → Sign-in method → Email/Password → Aktifkan). Setelah diaktifkan, coba lagi.';
     }
     if (m.indexOf('invalid-login-credentials') !== -1 || m.indexOf('INVALID_LOGIN_CREDENTIALS') !== -1) return 'Email atau password salah.';
     if (m.indexOf('invalid-credential') !== -1) return 'Email atau password salah.';
     if (m.indexOf('email-already-in-use') !== -1) return 'Email sudah terdaftar. Gunakan tombol MASUK.';
     if (m.indexOf('credential-already-in-use') !== -1) return 'Email ini sudah terhubung ke akun lain.';
+    if (m.indexOf('account-exists-with-different-credential') !== -1) return 'Email ini sudah dipakai akun lain.';
     if (m.indexOf('invalid-email') !== -1) return 'Format email tidak valid.';
     if (m.indexOf('weak-password') !== -1) return 'Password terlalu lemah (minimal 6 karakter).';
     if (m.indexOf('wrong-password') !== -1) return 'Password salah.';
@@ -658,6 +659,31 @@ function friendlyAuthError(codeOrMsg) {
     if (m.indexOf('requires-recent-login') !== -1) return 'Sesi sudah lama. Keluar lalu masuk lagi, lalu ulangi.';
     if (m.indexOf('network') !== -1 || m.indexOf('unavailable') !== -1) return 'Koneksi internet bermasalah. Coba lagi.';
     return m;
+}
+
+// Deteksi apakah provider Email/Password sudah diaktifkan di project Firebase.
+// Dipanggil sekali pas halaman PROFILE dibuka — kalau nonaktif, tampilkan peringatan
+// yang jelas (ini sumber utama error 400 saat daftar/masuk).
+async function checkEmailProviderEnabled() {
+    try {
+        const result = await firebase.auth().fetchSignInMethodsForEmail('provider-check@example.com');
+        // Sukses (array kosong/berisi) = provider aktif
+        const el = document.getElementById('authStatus');
+        if (el && el.dataset.providerWarn) delete el.dataset.providerWarn;
+        return true;
+    } catch(e) {
+        const m = String(e.message || '');
+        if (m.indexOf('operation-not-allowed') !== -1 || m.indexOf('OPERATION_NOT_ALLOWED') !== -1) {
+            const el = document.getElementById('authStatus');
+            if (el && !el.dataset.providerWarn) {
+                el.dataset.providerWarn = '1';
+                el.innerHTML = '⚠️ <b>Login Email/Password belum diaktifkan.</b> Buka Firebase Console → Authentication → Sign-in method → aktifkan <b>Email/Password</b>, lalu muat ulang halaman ini.';
+            }
+            return false;
+        }
+        // Error lain (misal network) — bukan soal provider, biarkan normal
+        return true;
+    }
 }
 
 function showStatusEl(el, msg, type) {
@@ -691,6 +717,8 @@ async function registerOrLinkAccount(email, password, name) {
         }
         return { ok: true, upgraded: false };
     } catch(e) {
+        // Log kode error asli biar gampang didiagnosa (misal auth/operation-not-allowed)
+        console.error('⚠️ Auth register error — code:', e.code || '(no code)', '| msg:', e.message);
         return { ok: false, msg: e.message };
     }
 }
@@ -887,6 +915,9 @@ function showAuth(tab) {
     if (typeof Game !== 'undefined') Game.state = 'menu';
     switchAuthTab(tab || 'login');
     refreshAuthStatus();
+    // Deteksi apakah provider Email/Password sudah diaktifkan (biar error 400
+    // nggak muncul misterius) — kalau nonaktif, tampilkan peringatan jelas.
+    if (typeof checkEmailProviderEnabled === 'function') checkEmailProviderEnabled();
 }
 
 function hideAuth() {
