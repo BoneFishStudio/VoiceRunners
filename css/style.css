@@ -54,17 +54,26 @@ html, body {
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     justify-content: center;
     align-items: center;
     background: rgba(0, 0, 0, 0.65);
     z-index: 10;
     backdrop-filter: blur(2px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .screen.active {
     display: flex;
     animation: screenFadeIn 0.3s ease-out;
 }
+
+/* Konten di-pusatkan dengan auto-margin → tetap bisa di-scroll kalau lebih tinggi dari layar */
+.screen.active > * { margin: auto; }
 
 @keyframes screenFadeIn {
     from { opacity: 0; }
@@ -109,7 +118,7 @@ html, body {
 
 .game-title h1 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 3rem;
+    font-size: clamp(1.7rem, 6vw, 3rem);
     font-weight: 900;
     letter-spacing: -2px;
     line-height: 0.9;
@@ -118,7 +127,7 @@ html, body {
 }
 
 .game-title .title-accent {
-    font-size: 4.5rem;
+    font-size: clamp(2.4rem, 9vw, 4.5rem);
     background: linear-gradient(90deg, #fff 0%, #aaa 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -219,12 +228,12 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 0.8rem;
-    padding: 1rem 2rem;
+    padding: clamp(0.75rem, 2vw, 1rem) clamp(1.1rem, 3vw, 2rem);
     border: 2px solid var(--border);
     background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
-    font-size: 1rem;
+    font-size: clamp(0.78rem, 2.4vw, 1rem);
     font-weight: 700;
     letter-spacing: 2px;
     cursor: pointer;
@@ -233,6 +242,8 @@ html, body {
     text-transform: uppercase;
     position: relative;
     overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .menu-btn::before {
@@ -319,7 +330,7 @@ html, body {
 }
 
 .loading-bar {
-    width: 280px;
+    width: min(80vw, 280px);
     height: 4px;
     background: var(--surface2);
     border-radius: 2px;
@@ -357,8 +368,8 @@ html, body {
 
 .mode-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.5rem;
-    margin-bottom: 2rem;
+    font-size: clamp(1.15rem, 5vw, 1.5rem);
+    margin-bottom: clamp(1rem, 4vh, 2rem);
     letter-spacing: 3px;
 }
 
@@ -399,12 +410,12 @@ html, body {
 }
 
 .mode-icon {
-    font-size: 3rem;
+    font-size: clamp(2.2rem, 9vw, 3rem);
 }
 
 .mode-title {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.2rem;
+    font-size: clamp(0.95rem, 4vw, 1.2rem);
     letter-spacing: 2px;
 }
 
@@ -440,8 +451,8 @@ html, body {
 
 .mp-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.3rem;
-    margin-bottom: 1.5rem;
+    font-size: clamp(1.05rem, 4.5vw, 1.3rem);
+    margin-bottom: clamp(1rem, 3vh, 1.5rem);
     letter-spacing: 3px;
 }
 
@@ -503,7 +514,7 @@ html, body {
 
 .mp-room-code h3 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 8vw, 2rem);
     letter-spacing: 8px;
     color: var(--text);
 }
@@ -703,7 +714,7 @@ html, body {
 
 .countdown-number {
     font-family: 'Press Start 2P', monospace;
-    font-size: 8rem;
+    font-size: clamp(4.5rem, 22vw, 8rem);
     color: var(--text);
     animation: countPop 0.8s ease-out;
     text-shadow: 0 0 60px rgba(255,255,255,0.3);
@@ -782,14 +793,75 @@ html, body {
     text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding: 2rem;
+    gap: 0.9rem;
+    padding: clamp(1.5rem, 5vw, 2.5rem);
+    width: min(92vw, 400px);
+    background: linear-gradient(165deg, rgba(26,30,38,0.95) 0%, rgba(10,12,18,0.97) 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    box-shadow: 0 0 60px rgba(100,200,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
+    margin: auto;
+}
+
+.pause-icon {
+    font-size: clamp(2.4rem, 10vw, 3rem);
+    line-height: 1;
+    animation: pulse 1.8s infinite;
 }
 
 .pause-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
+    font-size: clamp(1.2rem, 5vw, 1.6rem);
+    margin-bottom: 0.2rem;
+    letter-spacing: 3px;
+    color: var(--text);
+}
+
+.pause-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+}
+
+.pause-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin: 0.6rem 0;
+}
+
+.pause-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+
+.pause-stat-label {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+.pause-stat-value {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.9rem;
+    color: #64c8ff;
+}
+
+.pause-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+}
+
+.pause-buttons .menu-btn {
+    width: 100%;
 }
 
 /* Game Over */
@@ -808,59 +880,89 @@ html, body {
 
 .gameover-container {
     text-align: center;
-    padding: 2rem;
-    max-width: 400px;
+    padding: clamp(1.5rem, 5vw, 2.5rem);
+    max-width: min(92vw, 440px);
     width: 100%;
+    background: linear-gradient(165deg, rgba(30,26,34,0.95) 0%, rgba(12,10,16,0.97) 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    box-shadow: 0 0 80px rgba(255,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
     animation: fadeInUp 0.5s ease-out;
+    margin: auto;
 }
 
 .gameover-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
+    font-size: clamp(1.2rem, 5.5vw, 2rem);
+    margin-bottom: 0;
     color: var(--danger);
+    letter-spacing: 2px;
+    text-shadow: 0 0 30px rgba(255,68,68,0.35);
 }
 
 .gameover-container.win h2 {
     color: var(--success);
+    text-shadow: 0 0 30px rgba(68,255,68,0.35);
 }
 
-.gameover-stats {
-    margin-bottom: 1.5rem;
+.go-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 1.3rem;
 }
 
-.gameover-stats p {
-    font-size: 1.2rem;
-    margin: 0.5rem 0;
+.go-icon {
+    font-size: clamp(2.5rem, 12vw, 3.6rem);
+    animation: pulse 1.6s infinite;
+    line-height: 1;
+}
+
+.go-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin-bottom: 1.1rem;
+}
+
+.go-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.9rem 0.6rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+}
+
+.go-stat-label {
+    font-size: 0.66rem;
     color: var(--text-dim);
-}
-
-.gameover-stats p span {
-    color: var(--text);
+    letter-spacing: 2px;
+    text-transform: uppercase;
     font-weight: 700;
 }
 
-/* Skor akhir + catatan jarak kematian */
-.gameover-stats .go-score {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: var(--text);
-    margin-bottom: 0.3rem;
-}
-
-.gameover-stats .go-score span {
+.go-stat-value {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(1rem, 5vw, 1.5rem);
     color: var(--warning);
-    font-size: 1.9rem;
+    word-break: break-word;
 }
 
-.gameover-stats .go-death {
-    font-size: 1.05rem;
-    color: var(--danger);
-    margin-top: 0.15rem;
+.go-stat-value.go-stat-dist {
+    color: #64c8ff;
 }
 
-.gameover-stats .go-death span {
-    color: var(--danger);
+.go-best {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 1.1rem;
+}
+
+.go-best span {
+    color: #ffd700;
     font-weight: 800;
 }
 
@@ -870,24 +972,47 @@ html, body {
 
 .gameover-input input {
     width: 100%;
-    padding: 0.8rem 1rem;
-    background: var(--surface);
+    padding: 0.9rem 1rem;
+    background: rgba(0,0,0,0.4);
     border: 2px solid var(--border);
-    border-radius: 4px;
+    border-radius: 12px;
     color: var(--text);
     font-family: 'Inter', sans-serif;
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 3vw, 1.05rem);
     text-align: center;
     outline: none;
     transition: border-color 0.3s;
+    -webkit-appearance: none;
 }
 
 .gameover-input input:focus {
-    border-color: var(--text);
+    border-color: var(--warning);
 }
 
-.gameover-container .menu-btn {
-    margin-top: 0.5rem;
+.go-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.go-actions .menu-btn {
+    margin-top: 0;
+    width: 100%;
+}
+
+/* Tombol TONTON IKLAN — paling menonjol (placeholder ad, bukan SDK asli) */
+.menu-btn.ad {
+    background: linear-gradient(135deg, #ffaa00, #ff6a00);
+    color: #1a0a00;
+    border-color: #ffaa00;
+    font-weight: 900;
+    box-shadow: 0 4px 24px rgba(255,150,0,0.35);
+}
+
+.menu-btn.ad:hover {
+    background: linear-gradient(135deg, #ffc033, #ff8533);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 32px rgba(255,150,0,0.5);
 }
 
 /* Win Screen */
@@ -915,8 +1040,8 @@ html, body {
 
 .lb-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.3rem;
-    margin-bottom: 1.5rem;
+    font-size: clamp(1.05rem, 4.5vw, 1.3rem);
+    margin-bottom: clamp(1rem, 3vh, 1.5rem);
     letter-spacing: 3px;
 }
 
@@ -1024,8 +1149,8 @@ html, body {
 
 .settings-container h2 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 1.3rem;
-    margin-bottom: 1.5rem;
+    font-size: clamp(1.05rem, 4.5vw, 1.3rem);
+    margin-bottom: clamp(1rem, 3vh, 1.5rem);
     text-align: center;
     letter-spacing: 3px;
 }
@@ -1688,4 +1813,104 @@ body::-webkit-scrollbar {
 #accountUserBox .menu-btn {
     width: 100%;
     justify-content: center;
+}
+
+/* ==================================================================
+   RESPONSIVE OVERHAUL — semua ukuran layar (320px → desktop)
+   ================================================================== */
+
+/* --- FIX PENTING: overlay tidak punya display:flex saat ditampilkan ---
+   (dulu konten game over/pause muncul di kiri-atas, tidak di tengah) */
+#pauseMenu, #gameOverScreen, #winScreen, #exitConfirm, #adPlaceholder,
+#micPermissionOverlay, #countdownOverlay, #instructionsOverlay {
+    display: flex;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Konten overlay di-pusatkan + tetap bisa scroll kalau melebihi layar */
+#pauseMenu > *, #gameOverScreen > *, #winScreen > *,
+#exitConfirm > *, #adPlaceholder > *, #micPermissionOverlay > *,
+#countdownOverlay > *, #instructionsOverlay > * {
+    margin: auto;
+}
+
+#voiceIndicator { /* tidak diubah — diposisikan bottom-center */ }
+
+/* Tombol & input: hilangkan tap-highlight biru iOS/Android */
+button, input, select { -webkit-tap-highlight-color: transparent; }
+input, select { touch-action: manipulation; }
+
+/* Layar lebar: konten tidak melebar tak terkontrol */
+@media (min-width: 1024px) {
+    .mode-btn { padding: 2.5rem 2rem; }
+    .menu-left { padding: 3.5rem; }
+}
+
+/* --- Tablet / mobile kecil --- */
+@media (max-width: 480px) {
+    .menu-left { padding: 1rem; }
+    .menu-mobile { padding: 1rem; }
+    .menu-buttons { gap: 0.5rem; }
+    .menu-footer p { padding: 0.6rem; font-size: 0.75rem; }
+    .menu-footer { margin-top: 1rem; }
+    .mode-container, .mp-container, .lb-container, .settings-container { padding: 1.2rem; }
+    .mp-room-code { padding: 1rem; }
+    .mp-room-code h3 { letter-spacing: 6px; }
+    .hud-score { font-size: 0.6rem; }
+    .hud-distance { font-size: 0.8rem; }
+    .hud-lives { font-size: 0.95rem; }
+    #hud { padding: 0.6rem 0.8rem; }
+    .volume-label { display: none; }
+    .volume-bar-bg { width: 34px; }
+    .lb-item { gap: 0.6rem; padding: 0.7rem 0.7rem; }
+    .lb-rank { min-width: 24px; font-size: 0.75rem; }
+    .lb-name { font-size: 0.85rem; }
+    .lb-score { font-size: 0.7rem; }
+    .setting-item { padding: 0.85rem 1rem; }
+    .setting-slider input[type="range"] { width: 90px; }
+    .confirm-dialog { padding: 1.5rem; }
+    .pause-buttons .menu-btn, .go-actions .menu-btn { min-height: 48px; }
+}
+
+/* --- HP sangat kecil (320-360px, mis. iPhone SE 1st gen) --- */
+@media (max-width: 360px) {
+    .game-title h1 { font-size: 1.45rem; }
+    .game-title .title-accent { font-size: 2rem; }
+    .menu-btn { font-size: 0.75rem; padding: 0.7rem 0.9rem; gap: 0.5rem; }
+    .go-stats-grid, .pause-stats { gap: 0.5rem; }
+    .mp-tab { font-size: 0.72rem; padding: 0.6rem 0.5rem; }
+    .hud-btn { padding: 0.4rem 0.6rem; font-size: 0.95rem; }
+}
+
+/* --- HP landscape pendek (tinggi < 500px) --- */
+@media (orientation: landscape) and (max-height: 500px) {
+    .menu-mobile { justify-content: flex-start; padding-top: 1rem; }
+    .menu-buttons { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
+    .menu-btn { padding: 0.5rem 0.9rem; font-size: 0.68rem; }
+    .menu-footer { display: none; }
+    .mode-buttons { flex-direction: row; }
+    .mode-btn { padding: 1rem; }
+    .gameover-container, .pause-container { padding: 1.1rem; }
+    .go-icon, .pause-icon { font-size: 1.8rem; }
+    .go-stats-grid { margin-bottom: 0.7rem; }
+    .instructions-content { padding: 1rem; max-height: 92vh; overflow-y: auto; }
+    .settings-container, .mp-container, .lb-container { padding: 1rem; }
+}
+
+/* --- Layar pendek (tinggi < 640px, tablet potrait sempit) --- */
+@media (max-height: 640px) and (min-width: 481px) {
+    .menu-left { padding: 1.5rem; }
+    .game-title h1 { font-size: clamp(1.5rem, 5vw, 2.4rem); }
+    .game-title .title-accent { font-size: clamp(2.1rem, 7vw, 3.2rem); }
+    .mode-btn { padding: 1.3rem; }
+    .menu-footer { margin-top: 1rem; }
+}
+
+/* --- Safe area untuk HP ber-notch --- */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    #hud { padding-top: calc(1rem + env(safe-area-inset-top)); }
+    .screen.active { padding-bottom: calc(env(safe-area-inset-bottom)); }
 }

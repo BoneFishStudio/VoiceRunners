@@ -249,26 +249,54 @@
         <!-- Pause Menu -->
         <div id="pauseMenu" class="overlay-hidden">
             <div class="pause-container">
+                <div class="pause-icon">⏸️</div>
                 <h2>PAUSE</h2>
-                <button class="menu-btn primary" onclick="resumeGame()">▶ LANJUTKAN</button>
-                <button class="menu-btn" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                <p class="pause-sub">Arena menunggumu — istirahat sebentar.</p>
+                <div class="pause-stats">
+                    <div class="pause-stat">
+                        <span class="pause-stat-label">JARAK</span>
+                        <span class="pause-stat-value" id="pauseDistance">0 m</span>
+                    </div>
+                    <div class="pause-stat">
+                        <span class="pause-stat-label">SKOR</span>
+                        <span class="pause-stat-value" id="pauseScore">0</span>
+                    </div>
+                </div>
+                <div class="pause-buttons">
+                    <button class="menu-btn primary" onclick="resumeGame()">▶ LANJUTKAN</button>
+                    <button class="menu-btn" onclick="toggleMusic()">🎵 MUSIK</button>
+                    <button class="menu-btn" onclick="Game.showInstructions()">❓ CARA MAIN</button>
+                    <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                </div>
             </div>
         </div>
 
         <!-- Game Over -->
         <div id="gameOverScreen" class="overlay-hidden">
             <div class="gameover-container">
-                <h2>💀 GAME OVER</h2>
-                <div class="gameover-stats">
-                    <p class="go-score">SKOR: <span id="finalScore">0</span></p>
-                    <p class="go-death">💀 Mati di <span id="finalDistance">0</span> m</p>
+                <div class="go-banner">
+                    <div class="go-icon">💀</div>
+                    <h2>GAME OVER</h2>
                 </div>
+                <div class="go-stats-grid">
+                    <div class="go-stat">
+                        <span class="go-stat-label">SKOR</span>
+                        <span class="go-stat-value" id="finalScore">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label">JARAK</span>
+                        <span class="go-stat-value go-stat-dist" id="finalDistance">0 m</span>
+                    </div>
+                </div>
+                <p class="go-best">🏆 Rekor pribadimu: <span id="finalBest">0</span></p>
                 <div class="gameover-input">
-                    <input type="text" id="playerName" placeholder="Nama kamu" maxlength="12">
+                    <input type="text" id="playerName" placeholder="Nama kamu" maxlength="12" autocomplete="off">
                 </div>
-                <button class="menu-btn primary" onclick="watchAd()">📺 TONTON IKLAN — LANJUT DI SINI</button>
-                <button class="menu-btn" onclick="saveScoreAndRestart()">↻ MULAI DARI AWAL</button>
-                <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                <div class="go-actions">
+                    <button class="menu-btn ad" onclick="watchAd()">📺 TONTON IKLAN — LANJUT DI SINI</button>
+                    <button class="menu-btn primary" onclick="saveScoreAndRestart()">↻ MULAI DARI AWAL</button>
+                    <button class="menu-btn exit" onclick="showMainMenu()">🏠 MAIN MENU</button>
+                </div>
             </div>
         </div>
 

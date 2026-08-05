@@ -1867,7 +1867,7 @@ const Game = {
         
         // Show game over screen
         document.getElementById('finalScore').textContent = this.score;
-        document.getElementById('finalDistance').textContent = Math.floor(this.distance);
+        document.getElementById('finalDistance').textContent = Math.floor(this.distance) + ' m';
         document.getElementById('gameOverScreen').classList.remove('overlay-hidden');
         
         // Auto-fill name from saved
@@ -1875,6 +1875,19 @@ const Game = {
         if (savedName) {
             document.getElementById('playerName').value = savedName;
         }
+        
+        // 🏆 Rekor pribadi terbaik (localStorage) untuk tampilan Game Over
+        let bestLocal = 0;
+        try {
+            const savedLb = localStorage.getItem('voiceRunner_leaderboard');
+            if (savedLb) {
+                const lb = JSON.parse(savedLb);
+                const tops = lb.filter(e => e.type !== 'checkpoint').sort((a, b) => b.score - a.score);
+                bestLocal = tops.length ? tops[0].score : 0;
+            }
+        } catch(e) {}
+        const bestEl = document.getElementById('finalBest');
+        if (bestEl) bestEl.textContent = Math.max(bestLocal, this.score);
         
         // 🌍 Simpan skor ke GLOBAL leaderboard (Firebase, anonymous auth) — best-effort.
         // Tetap simpan ke localStorage juga sebagai cache/fallback offline.
@@ -3198,6 +3211,11 @@ const Game = {
         if (this.state === 'solo' || this.state === 'multiplayer') {
             this.state = 'paused';
             document.getElementById('pauseMenu').classList.remove('overlay-hidden');
+            // Isi statistik di menu pause
+            const pd = document.getElementById('pauseDistance');
+            const ps = document.getElementById('pauseScore');
+            if (pd) pd.textContent = Math.floor(this.distance) + ' m';
+            if (ps) ps.textContent = this.score;
         } else if (this.state === 'paused') {
             this.resumeGame();
         }
