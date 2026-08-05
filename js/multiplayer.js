@@ -464,7 +464,38 @@ const Multiplayer = {
 
 let authUid = null;
 let authReady = false;
+let authUser = null;      // Objek user Firebase aktif (anonim / email)
+let cachedRole = 'anon';  // Role tersimpan (admin/moderator/user/anon)
 let _pendingGlobalScores = []; // Antrian skor kalau auth belum siap (run pertama tidak hilang)
+
+// Role terakhir di-cache ke localStorage biar UI langsung tampil tanpa nunggu network
+// (di-refresh lagi dari server begitu auth siap).
+try {
+    const savedRole = localStorage.getItem('voiceRunner_userRole');
+    if (savedRole === 'admin' || savedRole === 'moderator' || savedRole === 'user' || savedRole === 'anon') {
+        cachedRole = savedRole;
+    }
+} catch(e) {}
+
+// Aman dipakai buat nampilin input user di HTML (cegah XSS lewat nama)
+function escapeHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Ambil role user dari /userRoles/{uid}.
+// Default kalau tidak ada entry: anon (anonymous auth) atau user (akun email).
+async function fetchRole(uid) {
+    const fallback = (authUser && !authUser.isAnonymous) ? 'user' : 'anon';
+    if (!database || !uid) return fallback;
+    try {
+        const snap = await database.ref('userRoles/' + uid).once('value');
+        const r = snap.val();
+        if (r === 'admin' || r === 'moderator' || r === 'user' || r === 'anon') return r;
+    } catch(e) { /* best-effort */ }
+    return fallback;
+}
 
 async function initFirebaseAuth() {
     if (!fbInitialized) return;
@@ -473,34 +504,58 @@ async function initFirebaseAuth() {
             console.warn('firebase-auth.js tidak dimuat — global leaderboard nonaktif');
             return;
         }
-        const current = firebase.auth().currentUser;
-        if (current) {
-            authUid = current.uid;
-            authReady = true;
-        } else {
-            const cred = await firebase.auth().signInAnonymously();
-            authUid = cred.user.uid;
-            authReady = true;
-            console.log('✅ Anonymous auth:', authUid);
-        }
-        // Flush skor yang sempat di-antri sebelum auth siap
-        await flushPendingGlobalScores();
+        // onAuthStateChanged: kepakai juga saat upgrade Guest→akun permanen atau login/logout,
+        // jadi UID + role otomatis di-refresh tanpa reload halaman.
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                // ⚠️ Guard race: kalau ada callback lama yang selesai lebih lambat
+                // (misal upgrade Guest→email), jangan timpa state dengan user basi.
+                if (firebase.auth().currentUser !== user) return;
+                authUser = user;
+                authUid = user.uid;
+                authReady = true;
+                cachedRole = await fetchRole(user.uid);
+                // Cek lagi setelah await — user bisa berubah saat fetchRole berjalan
+                if (firebase.auth().currentUser !== user) return;
+                try { localStorage.setItem('voiceRunner_userRole', cachedRole); } catch(e) {}
+                console.log('✅ Auth:', user.isAnonymous ? 'anonim' : 'email', '| role:', cachedRole);
+                // Flush skor yang sempat di-antri sebelum auth siap
+                await flushPendingGlobalScores();
+                if (typeof refreshAccountUI === 'function') refreshAccountUI();
+            } else {
+                // Belum ada sesi → sign-in anonim otomatis (Guest)
+                try {
+                    await firebase.auth().signInAnonymously();
+                } catch(e) {
+                    console.warn('Anonymous auth gagal:', e.message);
+                }
+            }
+        });
     } catch(e) {
-        console.warn('Anonymous auth gagal:', e.message);
+        console.warn('Auth init error:', e.message);
     }
 }
 
 async function flushPendingGlobalScores() {
-    while (_pendingGlobalScores.length) {
-        const p = _pendingGlobalScores.shift();
-        try {
-            await saveGlobalLeaderboard(p.name, p.score, p.distance);
-        } catch(e) { /* best-effort */ }
+    // Hanya flush entry TERBARU per sesi — kalau ada skor lama yang lebih kecil
+    // dari skor terbaru, buang. Cegah double-write <5 detik yang ditolak rules
+    // (rate limit) dan cegah nama lama menimpa nama baru.
+    if (!_pendingGlobalScores.length) return;
+    let best = _pendingGlobalScores[_pendingGlobalScores.length - 1];
+    for (const p of _pendingGlobalScores) {
+        if ((p.score || 0) > (best.score || 0)) best = p;
     }
+    _pendingGlobalScores = [];
+    try {
+        await saveGlobalLeaderboard(best.name, best.score, best.distance);
+    } catch(e) { /* best-effort */ }
 }
 
 function getAuthUid() { return authUid; }
 function isAuthReady() { return authReady; }
+// Role aktif pemain saat ini (default 'anon')
+function getUserRole() { return cachedRole; }
+function isCurrentUserMod() { return cachedRole === 'admin' || cachedRole === 'moderator'; }
 
 // Simpan skor terbaik ke /leaderboard/{uid} (best-effort, tidak mengganggu game).
 // Kalau auth/Firebase gagal → return false, skor tetap aman di localStorage.
@@ -522,11 +577,15 @@ async function saveGlobalLeaderboard(name, score, distance) {
         if (existing && typeof existing.score === 'number' && existing.score >= score) {
             return false;
         }
+        // Tandai Guest (anonim) + timestamp submit buat anti-cheat rate limit di rules.
+        const isGuest = !!(authUser && authUser.isAnonymous);
         await ref.set({
             name: String(name || 'Anonim').slice(0, 20),
             score: Math.floor(score) || 0,
             distance: Math.floor(distance) || 0,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            lastSubmitTimestamp: Date.now(),
+            isGuest: isGuest
         });
         console.log('🌍 Skor global tersimpan:', score);
         return true;
@@ -568,6 +627,207 @@ function loadGlobalLeaderboard(limit) {
                 resolve([]);
             });
     });
+}
+
+// ============================================================
+// 👥 SISTEM ROLE + AKUN (admin / moderator / user / anon)
+// ============================================================
+// Data role: /userRoles/{uid} = "admin" | "moderator" | "user" | "anon"
+// - Default (tanpa entry) = "anon" (guest) / "user" (akun email)
+// - Hanya ADMIN yang bisa mengubah role siapa pun (di-enforce juga di Security Rules)
+// - Bootstrap admin pertama dilakukan MANUAL di Firebase Console (lihat README/docs)
+
+// Terjemahkan pesan error Firebase Auth ke Bahasa Indonesia yang ramah user
+function friendlyAuthError(codeOrMsg) {
+    const m = String(codeOrMsg || '');
+    if (m.indexOf('email-already-in-use') !== -1) return 'Email sudah terdaftar. Coba gunakan tombol MASUK, bukan DAFTAR.';
+    if (m.indexOf('credential-already-in-use') !== -1) return 'Email ini sudah terhubung ke akun lain.';
+    if (m.indexOf('invalid-email') !== -1) return 'Format email tidak valid.';
+    if (m.indexOf('weak-password') !== -1) return 'Password terlalu lemah (minimal 6 karakter).';
+    if (m.indexOf('wrong-password') !== -1) return 'Password salah.';
+    if (m.indexOf('user-not-found') !== -1) return 'Akun tidak ditemukan. Periksa email atau daftar dulu.';
+    if (m.indexOf('too-many-requests') !== -1) return 'Terlalu banyak percobaan. Coba lagi beberapa saat.';
+    if (m.indexOf('network') !== -1 || m.indexOf('unavailable') !== -1) return 'Koneksi internet bermasalah. Coba lagi.';
+    return m;
+}
+
+function showStatusEl(el, msg, type) {
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'mp-status ' + (type || 'info');
+    el.style.display = 'block';
+    setTimeout(() => { if (el.textContent === msg) el.style.display = 'none'; }, 6000);
+}
+
+// ===== UPGRADE GUEST → AKUN PERMANEN (linkWithCredential) =====
+// Guest yang sudah punya skor "naik level" jadi user tanpa kehilangan apa pun:
+// UID berubah otomatis oleh Firebase & skor lama tetap mengikuti via anonymous auth.
+async function registerOrLinkAccount(email, password, name) {
+    if (!authReady || !authUser || !database) return { ok: false, msg: 'Koneksi/auth belum siap. Coba lagi sebentar.' };
+    try {
+        const user = firebase.auth().currentUser;
+        if (user && user.isAnonymous) {
+            // 🔁 Guest → upgrade ke akun email permanen (progress & UID lama ditautkan)
+            const cred = firebase.auth.EmailAuthProvider.credential(email, password);
+            await user.linkWithCredential(cred);
+            if (name) {
+                try { await user.updateProfile({ displayName: String(name).slice(0, 20) }); } catch(e) {}
+            }
+            return { ok: true, upgraded: true };
+        }
+        // Sudah user email — daftar akun baru terpisah
+        const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+        if (name) {
+            try { await cred.user.updateProfile({ displayName: String(name).slice(0, 20) }); } catch(e) {}
+        }
+        return { ok: true, upgraded: false };
+    } catch(e) {
+        return { ok: false, msg: e.message };
+    }
+}
+
+async function loginEmailAccount(email, password) {
+    try {
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+        return { ok: true };
+    } catch(e) {
+        return { ok: false, msg: e.message };
+    }
+}
+
+async function logoutAccount() {
+    try {
+        await firebase.auth().signOut();
+    } catch(e) {}
+    // onAuthStateChanged akan otomatis sign-in anonim lagi (jadi Guest)
+    refreshAccountUI();
+}
+
+// ===== MODERASI (hanya admin/moderator — di-enforce juga di Security Rules) =====
+// Admin: assign/cabut role user mana pun.
+async function assignUserRole(uid, role) {
+    if (!authReady || !authUid || !database) return { ok: false, msg: 'Koneksi/auth belum siap.' };
+    if (['admin', 'moderator', 'user', 'anon'].indexOf(role) === -1) return { ok: false, msg: 'Role tidak valid.' };
+    if (!uid) return { ok: false, msg: 'UID kosong.' };
+    try {
+        await database.ref('userRoles/' + uid).set(role);
+        return { ok: true };
+    } catch(e) {
+        return { ok: false, msg: e.message };
+    }
+}
+
+// Moderator/Admin: hapus entry leaderboard yang dicurigai curang.
+async function removeGlobalEntry(uid) {
+    if (!authReady || !authUid || !database) return { ok: false, msg: 'Koneksi/auth belum siap.' };
+    try {
+        await database.ref('leaderboard/' + uid).remove();
+        return { ok: true };
+    } catch(e) {
+        return { ok: false, msg: e.message };
+    }
+}
+
+// Dipanggil dari tombol 🗑 di leaderboard global (hanya tampil utk admin/moderator)
+async function deleteGlobalEntry(uid) {
+    if (!confirm('Hapus entry leaderboard ini?')) return;
+    const res = await removeGlobalEntry(uid);
+    if (res.ok) {
+        if (typeof updateLeaderboard === 'function') updateLeaderboard('global');
+    } else {
+        alert('Gagal hapus: ' + res.msg);
+    }
+}
+
+// ===== UI SETTINGS: AKUN & MODERASI =====
+
+// Refresh status akun + visibilitas section moderasi di Settings.
+function refreshAccountUI() {
+    const status = document.getElementById('accountStatus');
+    if (!status) return;
+    const guestBox = document.getElementById('accountGuestBox');
+    const userBox = document.getElementById('accountUserBox');
+    const modSection = document.getElementById('moderationSection');
+    const role = getUserRole();
+
+    if (!authUser) {
+        status.innerHTML = '⏳ Menghubungkan... (sign-in otomatis)';
+        if (guestBox) guestBox.style.display = 'none';
+        if (userBox) userBox.style.display = 'none';
+    } else if (authUser.isAnonymous) {
+        status.innerHTML = '🎭 <b>Guest (anonim)</b> — role: <b>' + escapeHtml(role) + '</b>';
+        if (guestBox) guestBox.style.display = 'block';
+        if (userBox) userBox.style.display = 'none';
+    } else {
+        const label = authUser.displayName || authUser.email || 'Akun';
+        status.innerHTML = '👤 <b>' + escapeHtml(label) + '</b> — role: <b>' + escapeHtml(role) + '</b>';
+        if (guestBox) guestBox.style.display = 'none';
+        if (userBox) {
+            userBox.style.display = 'block';
+            const info = document.getElementById('accountUserInfo');
+            if (info) info.textContent = 'Masuk sebagai ' + (authUser.email || label);
+        }
+    }
+
+    if (modSection) {
+        modSection.style.display = (role === 'admin' || role === 'moderator') ? 'block' : 'none';
+        const adminRoleBox = document.getElementById('adminRoleBox');
+        if (adminRoleBox) adminRoleBox.style.display = (role === 'admin') ? 'block' : 'none';
+    }
+}
+
+async function upgradeAccount() {
+    const msg = document.getElementById('accountMsg');
+    const email = document.getElementById('accEmail').value.trim();
+    const password = document.getElementById('accPassword').value;
+    const name = document.getElementById('accName').value.trim() || 'Pemain';
+    if (!email || password.length < 6) {
+        showStatusEl(msg, 'Email wajib diisi & password minimal 6 karakter.', 'error');
+        return;
+    }
+    const res = await registerOrLinkAccount(email, password, name);
+    if (res.ok) {
+        showStatusEl(msg, res.upgraded
+            ? '✅ Akun berhasil dibuat! Skor Guest-mu tetap tersimpan & kini tersinkron antar device.'
+            : '✅ Akun berhasil didaftarkan!', 'success');
+        refreshAccountUI();
+    } else {
+        showStatusEl(msg, '❌ ' + friendlyAuthError(res.msg), 'error');
+    }
+}
+
+async function loginAccount() {
+    const msg = document.getElementById('accountMsg');
+    const email = document.getElementById('accEmail').value.trim();
+    const password = document.getElementById('accPassword').value;
+    if (!email || !password) {
+        showStatusEl(msg, 'Masukkan email & password.', 'error');
+        return;
+    }
+    const res = await loginEmailAccount(email, password);
+    if (res.ok) {
+        showStatusEl(msg, '✅ Berhasil masuk! Skor akunmu tampil di leaderboard global.', 'success');
+        refreshAccountUI();
+    } else {
+        showStatusEl(msg, '❌ ' + friendlyAuthError(res.msg), 'error');
+    }
+}
+
+async function applyRole() {
+    const msg = document.getElementById('modMsg');
+    const uid = document.getElementById('modUid').value.trim();
+    const role = document.getElementById('modRoleSelect').value;
+    if (!uid) {
+        showStatusEl(msg, 'Masukkan UID user terlebih dahulu.', 'error');
+        return;
+    }
+    const res = await assignUserRole(uid, role);
+    if (res.ok) {
+        showStatusEl(msg, '✅ Role "' + role + '" diterapkan ke ' + uid, 'success');
+        document.getElementById('modUid').value = '';
+    } else {
+        showStatusEl(msg, '❌ ' + res.msg, 'error');
+    }
 }
 
 // ===== UI Functions =====
