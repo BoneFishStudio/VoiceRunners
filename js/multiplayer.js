@@ -798,10 +798,6 @@ function refreshAccountUI() {
         }
     }
 
-    // Tombol ubah foto hanya untuk akun permanen
-    const avatarEditBtn = document.getElementById('avatarEditBtn');
-    if (avatarEditBtn) avatarEditBtn.style.display = (authUser && !authUser.isAnonymous) ? 'flex' : 'none';
-
     // Isi detail akun lengkap (panel akun permanen)
     fillAccountDetails();
 
@@ -1055,33 +1051,6 @@ async function saveDisplayName() {
         refreshAccountUI();
     } catch(e) {
         if (window.Toast) window.Toast.error(friendlyAuthError(e.message));
-    }
-}
-
-function openPhotoPicker() {
-    const input = document.getElementById('photoInput');
-    if (input) input.click();
-}
-
-async function uploadProfilePhoto() {
-    const input = document.getElementById('photoInput') || document.getElementById('editPhotoInput');
-    const file = input && input.files && input.files[0];
-    if (!file) { if (window.Toast) window.Toast.error('Pilih file gambar dulu.'); return; }
-    const u = firebase.auth().currentUser;
-    if (!u || !window.StorageService) return;
-    if (window.Toast) window.Toast.loading('Mengupload foto...');
-    const res = await window.StorageService.uploadAvatar(file, u.uid);
-    window.Toast.hideLoading();
-    if (res.ok) {
-        try {
-            await u.updateProfile({ photoURL: res.url });
-        } catch(e) {}
-        if (window.ProfileService) window.ProfileService.updateProfile(u.uid, { photoURL: res.url }).catch(() => {});
-        if (window.Toast) window.Toast.success('Foto profil diperbarui!');
-        refreshAccountUI();
-    } else {
-        // Pesan dari StorageService sudah user-friendly (termasuk petunjuk CORS/gsutil)
-        if (window.Toast) window.Toast.error(res.msg || 'Gagal upload foto.');
     }
 }
 

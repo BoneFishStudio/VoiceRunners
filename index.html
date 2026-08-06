@@ -398,8 +398,7 @@
                             <div class="profile-email" id="profileEmail">Belum masuk</div>
                             <span class="profile-badge" id="profileBadge">GUEST</span>
                         </div>
-                        <button class="avatar-edit-btn" id="avatarEditBtn" onclick="openPhotoPicker()" title="Ubah foto profil" style="display:none;"><svg class="btn-icon"><use href="#icon-settings"/></svg></button>
-                        <input type="file" id="photoInput" accept="image/*" style="display:none;">
+
                     </div>
 
                     <!-- STATISTIK (dari localStorage) -->
@@ -486,11 +485,6 @@
                                 <label class="pd-label">Nama Tampilan</label>
                                 <input type="text" id="editDisplayName" placeholder="Nama tampilan" maxlength="20">
                                 <button class="menu-btn primary" onclick="saveDisplayName()"><svg class="btn-icon"><use href="#icon-check"/></svg> SIMPAN NAMA</button>
-                            </div>
-                            <div class="account-form">
-                                <label class="pd-label">Foto Profil</label>
-                                <input type="file" id="editPhotoInput" accept="image/*" style="margin-bottom:0.6rem;">
-                                <button class="menu-btn primary" onclick="uploadProfilePhoto()"><svg class="btn-icon"><use href="#icon-user"/></svg> UPLOAD FOTO</button>
                             </div>
                         </div>
 
@@ -712,7 +706,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
     <!-- Auth Services (modular, terpisah per domain) -->
     <script src="js/auth/firebase.js"></script>
@@ -720,7 +713,6 @@
     <script src="js/auth/toast.js"></script>
     <script src="js/auth/profileService.js"></script>
     <script src="js/auth/databaseService.js"></script>
-    <script src="js/auth/storageService.js"></script>
     <script src="js/auth/authService.js"></script>
 
     <!-- Game Scripts -->

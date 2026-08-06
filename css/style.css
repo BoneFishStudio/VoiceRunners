@@ -2459,28 +2459,6 @@ body::-webkit-scrollbar {
     object-fit: cover;
 }
 
-.avatar-edit-btn {
-    position: absolute;
-    right: -0.4rem;
-    top: -0.4rem;
-    width: 1.9rem;
-    height: 1.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all 0.25s;
-}
-
-.avatar-edit-btn:hover {
-    color: var(--text);
-    border-color: var(--text);
-}
-
 /* ==================================================================
    RESPONSIVE OVERHAUL — semua ukuran layar (320px → desktop)
    ================================================================== */

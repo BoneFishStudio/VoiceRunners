@@ -2,7 +2,7 @@
    FIREBASE.JS — Inisialisasi Firebase (SDK v10 Compat)
    ============================
    Menggunakan firebase-compat v10.x — API sama dengan v8 (firebase.auth(),
-   firebase.database(), firebase.storage()), jadi aman untuk:
+   firebase.database()), jadi aman untuk:
    - browser web (Vercel / itch.io)
    - build desktop Electron (file:// — compat SDK tetap jalan, ES modules tidak)
    Seluruh service lain (authService, databaseService, dll) memakai instance
@@ -26,7 +26,6 @@
 
     var firebaseApp = null;
     var db = null;
-    var storageRef = null;
     var fbInitialized = false;
 
     function init() {
@@ -38,9 +37,6 @@
             }
             firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
             db = firebase.database();
-            if (typeof firebase.storage === 'function') {
-                storageRef = firebase.storage();
-            }
             fbInitialized = true;
             console.log('[firebase.js] Firebase SDK v10 compat terinisialisasi');
             return true;
@@ -54,7 +50,6 @@
         init: init,
         get app() { return firebaseApp; },
         get db() { return db; },
-        get storage() { return storageRef; },
         get initialized() { return fbInitialized; }
     };
 
