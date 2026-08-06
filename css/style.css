@@ -2177,6 +2177,113 @@ body::-webkit-scrollbar {
     border-top: 2px solid var(--surface2);
 }
 
+/* ===== PROFILE LAYOUT 2 KOLOM (kiri: identitas, kanan: aksi) ===== */
+.profile-layout {
+    width: min(94vw, 880px);
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.5rem;
+    margin-bottom: 0.4rem;
+    text-align: left;
+}
+
+.profile-left,
+.profile-right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.profile-right .auth-tabs {
+    margin-bottom: 0.2rem;
+}
+
+/* ===== TAB MODERASI (ROLES / GAME SETTINGS) ===== */
+.mod-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mod-tab {
+    flex: 1;
+    padding: 0.65rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.25s;
+    touch-action: manipulation;
+}
+
+.mod-tab:hover {
+    border-color: var(--text);
+    color: var(--text);
+}
+
+.mod-tab.active {
+    background: linear-gradient(135deg, #1b6bd6, #4bb8ff);
+    border-color: #4bb8ff;
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(75,184,255,0.3);
+}
+
+/* ===== FORM GAME CONFIG (admin/moderator) ===== */
+.game-config-form .gc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.game-config-form .gc-row label {
+    margin-bottom: 0;
+    font-size: 0.75rem;
+}
+
+.game-config-form input[type="number"] {
+    width: 110px;
+    flex-shrink: 0;
+    padding: 0.5rem 0.7rem;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.game-config-form input[type="number"]:focus {
+    border-color: var(--text);
+}
+
+@media (max-width: 640px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+    .game-config-form .gc-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.3rem;
+    }
+    .game-config-form input[type="number"] {
+        width: 100%;
+        text-align: left;
+    }
+}
+
 /* ==================================================================
    AUTH SERVICES UI — Toast, Loading, Skeleton, Verify, Profile details
    ================================================================== */

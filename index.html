@@ -384,151 +384,187 @@
 
     <!-- ========== PROFILE (LOGIN / DAFTAR / LUPA PASSWORD) ========== -->
     <div id="authScreen" class="screen">
-        <div class="auth-container">
+        <div class="auth-container profile-layout">
             <h2><svg class="title-icon"><use href="#icon-user"/></svg> PROFILE</h2>
 
-            <!-- ===== KARTU PROFIL ===== -->
-            <div class="profile-card">
-                <div class="profile-avatar" id="profileAvatar"><svg><use href="#icon-user"/></svg></div>
-                <div class="profile-meta">
-                    <div class="profile-name" id="profileName">Guest</div>
-                    <div class="profile-email" id="profileEmail">Belum masuk</div>
-                    <span class="profile-badge" id="profileBadge">GUEST</span>
-                </div>
-                <button class="avatar-edit-btn" id="avatarEditBtn" onclick="openPhotoPicker()" title="Ubah foto profil" style="display:none;"><svg class="btn-icon"><use href="#icon-settings"/></svg></button>
-                <input type="file" id="photoInput" accept="image/*" style="display:none;">
-            </div>
-
-            <!-- ===== STATISTIK (dari localStorage) ===== -->
-            <div class="profile-stats">
-                <div class="profile-stat">
-                    <span class="profile-stat-value" id="profileBestScore">0</span>
-                    <span class="profile-stat-label">SKOR TERBAIK</span>
-                </div>
-                <div class="profile-stat">
-                    <span class="profile-stat-value" id="profileBestDist">0m</span>
-                    <span class="profile-stat-label">JARAK TERJAUH</span>
-                </div>
-                <div class="profile-stat">
-                    <span class="profile-stat-value" id="profileGames">0</span>
-                    <span class="profile-stat-label">GAME DIMAINKAN</span>
-                </div>
-            </div>
-
-            <div class="auth-tabs">
-                <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">MASUK</button>
-                <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">DAFTAR</button>
-            </div>
-            <div class="auth-status" id="authStatus">Menghubungkan...</div>
-
-            <!-- LOGIN PANEL -->
-            <div class="auth-panel" id="authPanelLogin">
-                <div class="account-form">
-                    <input type="email" id="authEmail" placeholder="Email" maxlength="64" autocomplete="email">
-                    <input type="password" id="authPassword" placeholder="Password" maxlength="64" autocomplete="current-password">
-                    <button class="menu-btn primary" onclick="submitLogin()"><svg class="btn-icon"><use href="#icon-key"/></svg> MASUK</button>
-                </div>
-                <button class="auth-link" onclick="switchAuthTab('forgot')">Lupa password?</button>
-            </div>
-
-            <!-- REGISTER PANEL -->
-            <div class="auth-panel" id="authPanelRegister" style="display:none;">
-                <p class="auth-hint">Daftar akun permanen — skor Guest-mu otomatis ikut tersimpan & bisa diakses dari device lain.</p>
-                <div class="account-form">
-                    <input type="text" id="authName" placeholder="Nama tampilan (maks 20)" maxlength="20" autocomplete="nickname">
-                    <input type="email" id="authEmailReg" placeholder="Email" maxlength="64" autocomplete="email">
-                    <input type="password" id="authPasswordReg" placeholder="Password (min 8, huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
-                    <input type="password" id="authPasswordReg2" placeholder="Ulangi password" maxlength="64" autocomplete="new-password">
-                    <button class="menu-btn primary" onclick="submitRegister()"><svg class="btn-icon"><use href="#icon-check"/></svg> DAFTAR AKUN</button>
-                </div>
-            </div>
-
-            <!-- FORGOT PASSWORD PANEL -->
-            <div class="auth-panel" id="authPanelForgot" style="display:none;">
-                <p class="auth-hint">Masukkan email akunmu — kami kirim tautan untuk mereset password.</p>
-                <div class="account-form">
-                    <input type="email" id="authEmailForgot" placeholder="Email" maxlength="64" autocomplete="email">
-                    <button class="menu-btn primary" onclick="submitForgotPassword()"><svg class="btn-icon"><use href="#icon-mail"/></svg> KIRIM TAUTAN RESET</button>
-                </div>
-            </div>
-
-            <!-- KELUAR (untuk akun permanen) -->
-            <div class="auth-panel" id="authPanelLoggedIn" style="display:none;">
-                <p class="auth-hint" id="authLoggedInInfo">Kamu sudah masuk sebagai akun permanen.</p>
-                <button class="menu-btn" onclick="switchAuthTab('forgot')"><svg class="btn-icon"><use href="#icon-mail"/></svg> RESET PASSWORD</button>
-                <button class="menu-btn" onclick="toggleProfileEdit()"><svg class="btn-icon"><use href="#icon-settings"/></svg> EDIT PROFIL</button>
-                <button class="menu-btn exit" onclick="logoutAccount()"><svg class="btn-icon"><use href="#icon-logout"/></svg> KELUAR</button>
-            </div>
-
-            <!-- ===== INFO AKUN LENGKAP (hanya untuk akun permanen) ===== -->
-            <div class="auth-panel" id="authPanelAccountInfo" style="display:none;">
-                <div class="profile-details">
-                    <div class="profile-detail-row"><span class="pd-label">USERNAME</span><span class="pd-value" id="pdUsername">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">EMAIL</span><span class="pd-value" id="pdEmail">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">VERIFIKASI</span><span class="pd-value" id="pdVerified">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">UID</span><span class="pd-value pd-mono" id="pdUid">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">AKUN DIBUAT</span><span class="pd-value" id="pdCreated">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">LOGIN TERAKHIR</span><span class="pd-value" id="pdLastLogin">-</span></div>
-                    <div class="profile-detail-row"><span class="pd-label">PROVIDER</span><span class="pd-value" id="pdProvider">-</span></div>
-                </div>
-
-                <!-- EDIT PROFIL -->
-                <div id="profileEditBox" style="display:none;">
-                    <div class="account-form">
-                        <label class="pd-label">Nama Tampilan</label>
-                        <input type="text" id="editDisplayName" placeholder="Nama tampilan" maxlength="20">
-                        <button class="menu-btn primary" onclick="saveDisplayName()"><svg class="btn-icon"><use href="#icon-check"/></svg> SIMPAN NAMA</button>
+            <div class="profile-grid">
+                <!-- ================= KIRI: IDENTITAS & INFO AKUN ================= -->
+                <div class="profile-left">
+                    <!-- KARTU PROFIL -->
+                    <div class="profile-card">
+                        <div class="profile-avatar" id="profileAvatar"><svg><use href="#icon-user"/></svg></div>
+                        <div class="profile-meta">
+                            <div class="profile-name" id="profileName">Guest</div>
+                            <div class="profile-email" id="profileEmail">Belum masuk</div>
+                            <span class="profile-badge" id="profileBadge">GUEST</span>
+                        </div>
+                        <button class="avatar-edit-btn" id="avatarEditBtn" onclick="openPhotoPicker()" title="Ubah foto profil" style="display:none;"><svg class="btn-icon"><use href="#icon-settings"/></svg></button>
+                        <input type="file" id="photoInput" accept="image/*" style="display:none;">
                     </div>
-                    <div class="account-form">
-                        <label class="pd-label">Foto Profil</label>
-                        <input type="file" id="editPhotoInput" accept="image/*" style="margin-bottom:0.6rem;">
-                        <button class="menu-btn primary" onclick="uploadProfilePhoto()"><svg class="btn-icon"><use href="#icon-user"/></svg> UPLOAD FOTO</button>
+
+                    <!-- STATISTIK (dari localStorage) -->
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileBestScore">0</span>
+                            <span class="profile-stat-label">SKOR TERBAIK</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileBestDist">0m</span>
+                            <span class="profile-stat-label">JARAK TERJAUH</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileGames">0</span>
+                            <span class="profile-stat-label">GAME DIMAINKAN</span>
+                        </div>
+                    </div>
+
+                    <div class="auth-status" id="authStatus">Menghubungkan...</div>
+
+                    <!-- INFO AKUN LENGKAP (read-only — akun permanen) -->
+                    <div class="auth-panel" id="authPanelAccountInfo" style="display:none;">
+                        <div class="profile-details">
+                            <div class="profile-detail-row"><span class="pd-label">USERNAME</span><span class="pd-value" id="pdUsername">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">EMAIL</span><span class="pd-value" id="pdEmail">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">VERIFIKASI</span><span class="pd-value" id="pdVerified">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">UID</span><span class="pd-value pd-mono" id="pdUid">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">AKUN DIBUAT</span><span class="pd-value" id="pdCreated">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">LOGIN TERAKHIR</span><span class="pd-value" id="pdLastLogin">-</span></div>
+                            <div class="profile-detail-row"><span class="pd-label">PROVIDER</span><span class="pd-value" id="pdProvider">-</span></div>
+                        </div>
+                        <div id="accountInfoMsg" class="mp-status" style="display:none;"></div>
                     </div>
                 </div>
 
-                <!-- GANTI PASSWORD -->
-                <div id="passwordChangeBox" class="account-form" style="margin-top:0.8rem;">
-                    <label class="pd-label">Ganti Password</label>
-                    <input type="password" id="chgCurrentPassword" placeholder="Password saat ini" maxlength="64" autocomplete="current-password">
-                    <input type="password" id="chgNewPassword" placeholder="Password baru (min 8, ada huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
-                    <input type="password" id="chgConfirmPassword" placeholder="Ulangi password baru" maxlength="64" autocomplete="new-password">
-                    <button class="menu-btn primary" onclick="changeMyPassword()"><svg class="btn-icon"><use href="#icon-lock"/></svg> GANTI PASSWORD</button>
-                    <div id="pwdMsg" class="mp-status" style="display:none;"></div>
-                </div>
+                <!-- ================= KANAN: AKSI & AUTH ================= -->
+                <div class="profile-right">
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">MASUK</button>
+                        <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">DAFTAR</button>
+                    </div>
 
-                <!-- DELETE ACCOUNT -->
-                <button class="menu-btn exit" style="margin-top:0.8rem;" onclick="requestDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> HAPUS AKUN</button>
-                <div id="deleteConfirmBox" class="account-form" style="display:none;margin-top:0.6rem;">
-                    <p class="auth-hint" style="margin-bottom:0.5rem;text-align:left;">Masukkan password untuk konfirmasi penghapusan akun. Aksi ini tidak bisa dibatalkan.</p>
-                    <input type="password" id="deletePassword" placeholder="Password" maxlength="64" autocomplete="current-password">
-                    <button class="menu-btn exit" onclick="confirmDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> YA, HAPUS AKUN SAYA</button>
-                    <button class="menu-btn" onclick="cancelDeleteAccount()">BATAL</button>
-                    <div id="deleteMsg" class="mp-status" style="display:none;"></div>
-                </div>
+                    <!-- LOGIN PANEL -->
+                    <div class="auth-panel" id="authPanelLogin">
+                        <div class="account-form">
+                            <input type="email" id="authEmail" placeholder="Email" maxlength="64" autocomplete="email">
+                            <input type="password" id="authPassword" placeholder="Password" maxlength="64" autocomplete="current-password">
+                            <button class="menu-btn primary" onclick="submitLogin()"><svg class="btn-icon"><use href="#icon-key"/></svg> MASUK</button>
+                        </div>
+                        <button class="auth-link" onclick="switchAuthTab('forgot')">Lupa password?</button>
+                    </div>
 
-                <div id="accountInfoMsg" class="mp-status" style="display:none;"></div>
+                    <!-- REGISTER PANEL -->
+                    <div class="auth-panel" id="authPanelRegister" style="display:none;">
+                        <p class="auth-hint">Daftar akun permanen — skor Guest-mu otomatis ikut tersimpan & bisa diakses dari device lain.</p>
+                        <div class="account-form">
+                            <input type="text" id="authName" placeholder="Nama tampilan (maks 20)" maxlength="20" autocomplete="nickname">
+                            <input type="email" id="authEmailReg" placeholder="Email" maxlength="64" autocomplete="email">
+                            <input type="password" id="authPasswordReg" placeholder="Password (min 8, huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
+                            <input type="password" id="authPasswordReg2" placeholder="Ulangi password" maxlength="64" autocomplete="new-password">
+                            <button class="menu-btn primary" onclick="submitRegister()"><svg class="btn-icon"><use href="#icon-check"/></svg> DAFTAR AKUN</button>
+                        </div>
+                    </div>
+
+                    <!-- FORGOT PASSWORD PANEL -->
+                    <div class="auth-panel" id="authPanelForgot" style="display:none;">
+                        <p class="auth-hint">Masukkan email akunmu — kami kirim tautan untuk mereset password.</p>
+                        <div class="account-form">
+                            <input type="email" id="authEmailForgot" placeholder="Email" maxlength="64" autocomplete="email">
+                            <button class="menu-btn primary" onclick="submitForgotPassword()"><svg class="btn-icon"><use href="#icon-mail"/></svg> KIRIM TAUTAN RESET</button>
+                        </div>
+                    </div>
+
+                    <!-- PANEL AKUN PERMANEN (aksi) -->
+                    <div class="auth-panel" id="authPanelLoggedIn" style="display:none;">
+                        <p class="auth-hint" id="authLoggedInInfo">Kamu sudah masuk sebagai akun permanen.</p>
+                        <button class="menu-btn" onclick="switchAuthTab('forgot')"><svg class="btn-icon"><use href="#icon-mail"/></svg> RESET PASSWORD</button>
+                        <button class="menu-btn" onclick="toggleProfileEdit()"><svg class="btn-icon"><use href="#icon-settings"/></svg> EDIT PROFIL</button>
+                        <button class="menu-btn exit" onclick="logoutAccount()"><svg class="btn-icon"><use href="#icon-logout"/></svg> KELUAR</button>
+
+                        <!-- EDIT PROFIL -->
+                        <div id="profileEditBox" style="display:none;margin-top:0.8rem;">
+                            <div class="account-form">
+                                <label class="pd-label">Nama Tampilan</label>
+                                <input type="text" id="editDisplayName" placeholder="Nama tampilan" maxlength="20">
+                                <button class="menu-btn primary" onclick="saveDisplayName()"><svg class="btn-icon"><use href="#icon-check"/></svg> SIMPAN NAMA</button>
+                            </div>
+                            <div class="account-form">
+                                <label class="pd-label">Foto Profil</label>
+                                <input type="file" id="editPhotoInput" accept="image/*" style="margin-bottom:0.6rem;">
+                                <button class="menu-btn primary" onclick="uploadProfilePhoto()"><svg class="btn-icon"><use href="#icon-user"/></svg> UPLOAD FOTO</button>
+                            </div>
+                        </div>
+
+                        <!-- GANTI PASSWORD -->
+                        <div id="passwordChangeBox" class="account-form" style="margin-top:0.8rem;">
+                            <label class="pd-label">Ganti Password</label>
+                            <input type="password" id="chgCurrentPassword" placeholder="Password saat ini" maxlength="64" autocomplete="current-password">
+                            <input type="password" id="chgNewPassword" placeholder="Password baru (min 8, ada huruf besar/kecil & angka)" maxlength="64" autocomplete="new-password">
+                            <input type="password" id="chgConfirmPassword" placeholder="Ulangi password baru" maxlength="64" autocomplete="new-password">
+                            <button class="menu-btn primary" onclick="changeMyPassword()"><svg class="btn-icon"><use href="#icon-lock"/></svg> GANTI PASSWORD</button>
+                            <div id="pwdMsg" class="mp-status" style="display:none;"></div>
+                        </div>
+
+                        <!-- DELETE ACCOUNT -->
+                        <button class="menu-btn exit" style="margin-top:0.8rem;" onclick="requestDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> HAPUS AKUN</button>
+                        <div id="deleteConfirmBox" class="account-form" style="display:none;margin-top:0.6rem;">
+                            <p class="auth-hint" style="margin-bottom:0.5rem;text-align:left;">Masukkan password untuk konfirmasi penghapusan akun. Aksi ini tidak bisa dibatalkan.</p>
+                            <input type="password" id="deletePassword" placeholder="Password" maxlength="64" autocomplete="current-password">
+                            <button class="menu-btn exit" onclick="confirmDeleteAccount()"><svg class="btn-icon"><use href="#icon-trash"/></svg> YA, HAPUS AKUN SAYA</button>
+                            <button class="menu-btn" onclick="cancelDeleteAccount()">BATAL</button>
+                            <div id="deleteMsg" class="mp-status" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- ===== MODERASI (khusus admin/moderator — tampil otomatis) ===== -->
+            <!-- ===== MODERASI & GAME SETTINGS (admin/moderator — tampil otomatis) ===== -->
             <div id="moderationSection" class="auth-panel" style="display:none;">
                 <div class="mod-header">
                     <svg class="mini-icon"><use href="#icon-shield"/></svg>
-                    <h3 class="setting-section-title" style="margin-bottom:0;">MODERASI</h3>
+                    <h3 class="setting-section-title" style="margin-bottom:0;">MODERASI & PENGATURAN</h3>
                 </div>
-                <div id="adminRoleBox" style="display:none;">
-                    <p class="auth-hint" style="margin-bottom:0.6rem;text-align:left;">Atur role user (khusus Admin):</p>
-                    <div class="account-form">
-                        <input type="text" id="modUid" placeholder="UID user (dari Firebase Auth)" maxlength="64">
-                        <select id="modRoleSelect">
-                            <option value="user">user</option>
-                            <option value="moderator">moderator</option>
-                            <option value="anon">anon</option>
-                        </select>
-                        <button class="menu-btn primary" onclick="applyRole()"><svg class="btn-icon"><use href="#icon-check"/></svg> TERAPKAN ROLE</button>
+                <div class="mod-tabs">
+                    <button class="mod-tab active" id="modTabRoles" onclick="switchModTab('roles')">ROLES</button>
+                    <button class="mod-tab" id="modTabGame" onclick="switchModTab('game')">GAME SETTINGS</button>
+                </div>
+
+                <!-- TAB ROLES -->
+                <div id="modPanelRoles">
+                    <div id="adminRoleBox" style="display:none;">
+                        <p class="auth-hint" style="margin-bottom:0.6rem;text-align:left;">Atur role user (khusus Admin):</p>
+                        <div class="account-form">
+                            <input type="text" id="modUid" placeholder="UID user (dari Firebase Auth)" maxlength="64">
+                            <select id="modRoleSelect">
+                                <option value="user">user</option>
+                                <option value="moderator">moderator</option>
+                                <option value="anon">anon</option>
+                            </select>
+                            <button class="menu-btn primary" onclick="applyRole()"><svg class="btn-icon"><use href="#icon-check"/></svg> TERAPKAN ROLE</button>
+                        </div>
+                        <div id="modMsg" class="mp-status" style="display:none;"></div>
                     </div>
-                    <div id="modMsg" class="mp-status" style="display:none;"></div>
+                    <p class="auth-hint" style="margin-bottom:0;text-align:left;">Hapus skor mencurigakan lewat tab <b>GLOBAL</b> di leaderboard (tombol hapus muncul di tiap entry).</p>
                 </div>
-                <p class="auth-hint" style="margin-bottom:0;text-align:left;">Hapus skor mencurigakan lewat tab <b>GLOBAL</b> di leaderboard (tombol hapus muncul di tiap entry).</p>
+
+                <!-- TAB GAME SETTINGS -->
+                <div id="modPanelGame" style="display:none;">
+                    <p class="auth-hint" style="margin-bottom:0.8rem;text-align:left;">Atur keseimbangan permainan — tersimpan di Firebase dan berlaku untuk semua pemain. Perubahan langsung dipakai di game berikutnya.</p>
+                    <div class="account-form game-config-form">
+                        <div class="gc-row"><label class="pd-label" for="cfgBaseSpeed">Kecepatan dasar</label><input type="number" id="cfgBaseSpeed" min="2" max="20" step="1"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgMaxSpeed">Kecepatan maksimum</label><input type="number" id="cfgMaxSpeed" min="6" max="30" step="1"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgRampSpeedBoost">Boost kecepatan per ramp (1000m)</label><input type="number" id="cfgRampSpeedBoost" min="0" max="3" step="0.1"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgRampInterval">Jarak per ramp (meter)</label><input type="number" id="cfgRampInterval" min="300" max="3000" step="50"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgObstacleMinGap">Jarak min antar rintangan</label><input type="number" id="cfgObstacleMinGap" min="60" max="400" step="10"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgObstacleMaxGap">Jarak maks antar rintangan</label><input type="number" id="cfgObstacleMaxGap" min="100" max="600" step="10"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgPitChance">Peluang lubang (0-0.5)</label><input type="number" id="cfgPitChance" min="0" max="0.5" step="0.01"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgPitVolumeThreshold">Threshold volume isi lubang (0.05-0.5)</label><input type="number" id="cfgPitVolumeThreshold" min="0.05" max="0.5" step="0.01"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgThemeLength">Panjang siklus tema (meter)</label><input type="number" id="cfgThemeLength" min="300" max="2000" step="50"></div>
+                        <div class="gc-row"><label class="pd-label" for="cfgThemeBlendZone">Zona transisi tema (meter)</label><input type="number" id="cfgThemeBlendZone" min="50" max="500" step="10"></div>
+                        <button class="menu-btn primary" onclick="saveGameConfigFromForm()"><svg class="btn-icon"><use href="#icon-check"/></svg> SIMPAN KONFIGURASI</button>
+                        <button class="menu-btn" onclick="resetGameConfigFromForm()">RESET KE DEFAULT</button>
+                        <div id="gameConfigMsg" class="mp-status" style="display:none;"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="authMsg" class="mp-status" style="display:none;"></div>
