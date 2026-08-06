@@ -1080,7 +1080,8 @@ async function uploadProfilePhoto() {
         if (window.Toast) window.Toast.success('Foto profil diperbarui!');
         refreshAccountUI();
     } else {
-        if (window.Toast) window.Toast.error(friendlyAuthError(res.msg));
+        // Pesan dari StorageService sudah user-friendly (termasuk petunjuk CORS/gsutil)
+        if (window.Toast) window.Toast.error(res.msg || 'Gagal upload foto.');
     }
 }
 

@@ -37,7 +37,7 @@
     function uploadAvatar(file, uid) {
         var storage = global.FirebaseCore.storage;
         if (!storage) {
-            return Promise.resolve({ ok: false, msg: 'Firebase Storage belum diaktifkan di console.' });
+            return Promise.resolve({ ok: false, msg: 'Firebase Storage belum diaktifkan di console (aktifkan dulu di Firebase Console → Storage).' });
         }
         return resizeImage(file, 256)
             .then(function (blob) {
@@ -50,7 +50,19 @@
             })
             .catch(function (e) {
                 console.error('[storageService] Upload error:', e);
-                return { ok: false, msg: e.message };
+                var msg;
+                var raw = (e && e.message) ? String(e.message) : '';
+                // CORS block (preflight OPTIONS gagal) muncul sebagai Network/Unknown
+                // error di SDK — penyebabnya bucket Storage belum punya konfigurasi CORS.
+                var isCors = !e || e.code === 'storage/unknown' || /network|fetch|failed|blocked|cors|preflight/i.test(raw);
+                if (isCors) {
+                    msg = 'Upload diblokir CORS browser. Bucket Storage butuh konfigurasi CORS — jalankan: gsutil cors set cors.json gs://server-ba906.firebasestorage.app (file contoh: docs/cors.json).';
+                } else if (e && e.code === 'storage/unauthorized') {
+                    msg = 'Storage Rules menolak upload. Pastikan rules Storage mengizinkan pemilik menulis avatars/{uid}.';
+                } else {
+                    msg = 'Upload foto gagal: ' + raw + '.';
+                }
+                return { ok: false, msg: msg };
             });
     }
 
