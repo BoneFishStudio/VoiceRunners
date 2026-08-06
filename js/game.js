@@ -3136,7 +3136,7 @@ const Game = {
     // ===== MULTIPLAYER SYNC =====
     
     sendMPUpdate() {
-        if (!this.isMultiplayer || this.state === 'gameOver') return;
+        if (!this.isMultiplayer || this.state === 'gameOver' || this.state === 'paused') return;
         Multiplayer.updatePlayerState(
             this.score,
             Math.floor(this.distance),
@@ -3224,15 +3224,29 @@ const Game = {
             const ps = document.getElementById('pauseScore');
             if (pd) pd.textContent = Math.floor(this.distance) + ' m';
             if (ps) ps.textContent = this.score;
+            // Benar-benar berhenti: musik ikut dijeda saat pause
+            if (typeof AudioManager.pauseMusic === 'function') AudioManager.pauseMusic();
         } else if (this.state === 'paused') {
             this.resumeGame();
         }
     },
     
     resumeGame() {
+        const pauseMenu = document.getElementById('pauseMenu');
         if (this.state === 'paused') {
             this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
-            document.getElementById('pauseMenu').classList.add('overlay-hidden');
+            if (pauseMenu) pauseMenu.classList.add('overlay-hidden');
+            if (typeof AudioManager.resumeMusic === 'function') AudioManager.resumeMusic();
+        } else {
+            // Jangan pernah silent fail: laporkan state sebenarnya ke console
+            console.warn('[Pause] resumeGame() dipanggil saat state =', this.state);
+            // Fallback: kalau overlay pause masih kelihatan, paksa sembunyikan
+            // supaya UI tidak pernah "nyangkut" di layar pause walau state desync
+            if (pauseMenu && !pauseMenu.classList.contains('overlay-hidden')) {
+                this.state = this.isMultiplayer ? 'multiplayer' : 'solo';
+                pauseMenu.classList.add('overlay-hidden');
+                if (typeof AudioManager.resumeMusic === 'function') AudioManager.resumeMusic();
+            }
         }
     },
     
@@ -3244,7 +3258,10 @@ const Game = {
     
     toggleMusic() {
         const enabled = AudioManager.toggleMusic();
-        document.querySelector('.hud-btn[title="Musik"]').textContent = enabled ? '🎵' : '🚫';
+        // Indikator via class (icon SVG tetap tampil, cukup di-redam saat mati)
+        document.querySelectorAll('.hud-btn[title="Musik"], .menu-btn.music-btn').forEach(function(btn) {
+            btn.classList.toggle('music-off', !enabled);
+        });
     },
     
     watchAd() {

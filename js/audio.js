@@ -229,6 +229,16 @@ const AudioManager = {
         }
         this.isPlaying = false;
     },
+
+    // Jeda musik saat game di-pause (hanya redam gain, bukan stop —
+    // supaya bisa lanjut mulus dari posisi yang sama saat resume)
+    pauseMusic() {
+        if (this.musicGain) this.musicGain.gain.value = 0;
+    },
+
+    resumeMusic() {
+        if (this.musicGain) this.musicGain.gain.value = this.musicVolume;
+    },
     
     toggleMusic() {
         this.musicEnabled = !this.musicEnabled;
