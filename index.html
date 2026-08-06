@@ -289,7 +289,7 @@
         <!-- Pause Menu -->
         <div id="pauseMenu" class="overlay-hidden">
             <div class="pause-container">
-                <div class="pause-icon"><svg><use href="#icon-pause"/></svg></div>
+                <div class="pause-icon"><svg class="pause-icon"><use href="#icon-pause"/></svg></div>
                 <h2>PAUSE</h2>
                 <p class="pause-sub">Arena menunggumu — istirahat sebentar.</p>
                 <div class="pause-stats">
@@ -304,7 +304,7 @@
                 </div>
                 <div class="pause-buttons">
                     <button class="menu-btn primary" onclick="resumeGame()"><svg class="btn-icon"><use href="#icon-play"/></svg> LANJUTKAN</button>
-                    <button class="menu-btn" onclick="toggleMusic()"><svg class="btn-icon"><use href="#icon-music"/></svg> MUSIK</button>
+                    <button class="menu-btn music-btn" onclick="toggleMusic()"><svg class="btn-icon"><use href="#icon-music"/></svg> MUSIK</button>
                     <button class="menu-btn" onclick="Game.showInstructions()"><svg class="btn-icon"><use href="#icon-help"/></svg> CARA MAIN</button>
                     <button class="menu-btn exit" onclick="showMainMenu()"><svg class="btn-icon"><use href="#icon-home"/></svg> MAIN MENU</button>
                 </div>
@@ -315,7 +315,7 @@
         <div id="gameOverScreen" class="overlay-hidden">
             <div class="gameover-container">
                 <div class="go-banner">
-                    <div class="go-icon"><svg><use href="#icon-skull"/></svg></div>
+                    <div class="go-icon"><svg class="go-icon"><use href="#icon-skull"/></svg></div>
                     <h2>GAME OVER</h2>
                 </div>
                 <div class="go-stats-grid">
@@ -597,7 +597,7 @@
     <!-- ========== MIC PERMISSION OVERLAY ========== -->
     <div id="micPermissionOverlay" class="overlay-hidden">
         <div class="confirm-dialog mic-dialog">
-            <div class="mic-icon"><svg><use href="#icon-mic"/></svg></div>
+            <div class="mic-icon"><svg class="mic-icon"><use href="#icon-mic"/></svg></div>
             <h3>Akses Mikrofon Diperlukan</h3>
             <p>Voice Runner perlu akses mikrofon untuk fitur Voice Challenge!</p>
             <p class="mic-detail">Bersuara/teriak untuk melompat, dan TERIAK keras untuk mengisi lubang.</p>
@@ -619,7 +619,7 @@
             <h2><svg class="title-icon"><use href="#icon-help"/></svg> CARA BERMAIN</h2>
             <div class="instruction-steps">
                 <div class="instruction-item">
-                    <span class="instr-icon"><svg><use href="#icon-volume"/></svg></span>
+                    <span class="instr-icon"><svg class="instr-icon"><use href="#icon-volume"/></svg></span>
                     <div>
                         <strong>1. Buat Suara untuk Lompat!</strong>
                         <p>Semakin keras suaramu, semakin tinggi lompatan!</p>
@@ -627,30 +627,30 @@
                 </div>
                 <div class="instruction-volumes">
                     <div class="vol-item low">
-                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
+                        <span class="vol-icon"><svg class="vol-icon"><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">Pelan → Lompat rendah</span>
                         <span class="vol-type">Spike</span>
                     </div>
                     <div class="vol-item mid">
-                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
+                        <span class="vol-icon"><svg class="vol-icon"><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">Normal → Lompat sedang</span>
                         <span class="vol-type">Box</span>
                     </div>
                     <div class="vol-item high">
-                        <span class="vol-icon"><svg><use href="#icon-volume"/></svg></span>
+                        <span class="vol-icon"><svg class="vol-icon"><use href="#icon-volume"/></svg></span>
                         <span class="vol-desc">KERAS → Lompat tinggi</span>
                         <span class="vol-type">Tiang</span>
                     </div>
                 </div>
                 <div class="instruction-item">
-                    <span class="instr-icon"><svg><use href="#icon-alert"/></svg></span>
+                    <span class="instr-icon"><svg class="instr-icon"><use href="#icon-alert"/></svg></span>
                     <div>
                         <strong>2. TERIAK untuk Mengisi Lubang!</strong>
                         <p>Ada balon di atas lubang — TERIAK keras untuk memecahkannya, kotak jatuh mengisi lubang!</p>
                     </div>
                 </div>
                 <div class="instruction-item">
-                    <span class="instr-icon"><svg><use href="#icon-map-pin"/></svg></span>
+                    <span class="instr-icon"><svg class="instr-icon"><use href="#icon-map-pin"/></svg></span>
                     <div>
                         <strong>3. Nyawa & Game Over</strong>
                         <p>Nyawa habis = Game Over. Tonton iklan untuk lanjut dari titik kematian, atau mulai dari awal!</p>

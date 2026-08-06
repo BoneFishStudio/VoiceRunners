@@ -202,10 +202,6 @@ html, body {
 .feature-item:nth-child(2) { --i: 1; }
 .feature-item:nth-child(3) { --i: 2; }
 
-.feature-icon {
-    font-size: 1.3rem;
-}
-
 .feature-text {
     font-size: 0.85rem;
     font-weight: 600;
@@ -293,6 +289,12 @@ html, body {
     color: var(--bg);
 }
 
+/* Indikator musik mati — icon SVG tetap tampil, cukup di-redam */
+.menu-btn.music-off, .hud-btn.music-off {
+    opacity: 0.45;
+    filter: grayscale(1);
+}
+
 /* Icon SVG (sprite) — semua icon pakai stroke currentColor */
 .btn-icon {
     width: 1.15em;
@@ -361,6 +363,7 @@ html, body {
     stroke-linejoin: round;
     animation: pulse 1.8s infinite;
     color: #64c8ff;
+    margin: 0 auto;
 }
 
 .go-icon {
@@ -560,10 +563,6 @@ html, body {
 
 .mode-btn.multiplayer:hover {
     box-shadow: 0 0 30px rgba(100,200,255,0.15);
-}
-
-.mode-icon {
-    font-size: clamp(2.2rem, 9vw, 3rem);
 }
 
 .mode-title {
@@ -954,12 +953,7 @@ html, body {
     border-radius: 20px;
     box-shadow: 0 0 60px rgba(100,200,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
     margin: auto;
-}
-
-.pause-icon {
-    font-size: clamp(2.4rem, 10vw, 3rem);
-    line-height: 1;
-    animation: pulse 1.8s infinite;
+    animation: fadeInUp 0.3s ease-out;
 }
 
 .pause-container h2 {
@@ -1064,12 +1058,6 @@ html, body {
     align-items: center;
     gap: 0.7rem;
     margin-bottom: 1.3rem;
-}
-
-.go-icon {
-    font-size: clamp(2.5rem, 12vw, 3.6rem);
-    animation: pulse 1.6s infinite;
-    line-height: 1;
 }
 
 .go-stats-grid {
@@ -1692,12 +1680,6 @@ html, body {
     border: 1px solid rgba(255,255,255,0.06);
 }
 
-.instr-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
 .instruction-item strong {
     display: block;
     margin-bottom: 0.3rem;
@@ -1727,10 +1709,6 @@ html, body {
     background: rgba(255,255,255,0.03);
 }
 
-.vol-icon {
-    font-size: 1.5rem;
-}
-
 .vol-desc {
     font-size: 0.7rem;
     color: var(--text);
@@ -1750,10 +1728,6 @@ html, body {
 /* ===== PAUSE FADE-IN ===== */
 #pauseMenu {
     animation: fadeIn 0.2s ease-out;
-}
-
-.pause-container {
-    animation: fadeInUp 0.3s ease-out;
 }
 
 /* ===== RESPONSIVE UPDATES ===== */
@@ -1779,12 +1753,6 @@ html, body {
     background: rgba(0,0,0,0.85);
     z-index: 600;
     backdrop-filter: blur(8px);
-}
-
-.mic-dialog .mic-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    animation: pulse 1.5s infinite;
 }
 
 .mic-dialog h3 {
@@ -2084,6 +2052,7 @@ body::-webkit-scrollbar {
     border-radius: 14px;
     margin-bottom: 1rem;
     text-align: left;
+    position: relative;
 }
 
 .profile-avatar {
@@ -2403,10 +2372,6 @@ body::-webkit-scrollbar {
 .avatar-edit-btn:hover {
     color: var(--text);
     border-color: var(--text);
-}
-
-.profile-card {
-    position: relative;
 }
 
 /* ==================================================================
