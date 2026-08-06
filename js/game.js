@@ -5,26 +5,28 @@
 // ===== CONSTANTS =====
 const GRAVITY = 0.6;
 const GROUND_Y_RATIO = 0.78;
-const BASE_SPEED = 5;
-const MAX_SPEED = 14;
+// ⚙️ Konstanta ini sengaja pakai `let` — bisa ditimpa dari Firebase /gameConfig
+// (diatur admin/moderator lewat halaman PROFILE → GAME SETTINGS).
+let BASE_SPEED = 5;
+let MAX_SPEED = 14;
 const SPEED_INCREMENT = 0.001;
-const RAMP_SPEED_BOOST = 0.8;       // Tambahan speed per ramp (1000m)
-const RAMP_INTERVAL = 1000;         // Meter per ramp
-const OBSTACLE_MIN_GAP = 120;
-const OBSTACLE_MAX_GAP = 200;
-const PIT_CHANCE = 0.15;
+let RAMP_SPEED_BOOST = 0.8;       // Tambahan speed per ramp (1000m)
+let RAMP_INTERVAL = 1000;         // Meter per ramp
+let OBSTACLE_MIN_GAP = 120;
+let OBSTACLE_MAX_GAP = 200;
+let PIT_CHANCE = 0.15;
 
 // ===== VOICE CHALLENGE VOLUME (mekanik baru: TERIAK, bukan baca kalimat) =====
 // Skala volume 0-1 (getByteTimeDomainData). Threshold di atasnya = lubang terisi.
-const PIT_VOLUME_THRESHOLD = 0.18;  // Volume minimal utk mengisi lubang
+let PIT_VOLUME_THRESHOLD = 0.18;  // Volume minimal utk mengisi lubang
 const PIT_CHARGE_FRAMES = 6;        // Frame beruntun di atas threshold sebelum terisi (anti salah isi)
 
 // ===== SISTEM 5 TEMA BACKGROUND =====
 // Urutan siklus tema berdasarkan jarak (distance):
 // City → Forest → Night → Morning → Sore → ulang
 const THEME_CYCLE = ['city', 'forest', 'night', 'morning', 'sore'];
-const THEME_LENGTH = 800;       // Meter per tema penuh
-const THEME_BLEND_ZONE = 180;   // Zona transisi crossfade di ujung tiap tema (m)
+let THEME_LENGTH = 800;       // Meter per tema penuh
+let THEME_BLEND_ZONE = 180;   // Zona transisi crossfade di ujung tiap tema (m)
 const THEME_PREVIEW_SPEED = 1;  // DEV: set > 1 (misal 10) untuk preview transisi cepat
 
 // ===== DETEKSI DEVICE LOW-POWER (HP / hardware terbatas) =====
@@ -272,6 +274,10 @@ const Game = {
         
         // Init audio
         AudioManager.init();
+        
+        // Muat config game dari Firebase sejak awal (admin/moderator bisa ubah
+        // keseimbangan game) — resolve jauh sebelum pemain benar-benar start.
+        this.loadRemoteConfig();
         
         // Init multiplayer
         Multiplayer.init();
@@ -535,10 +541,42 @@ const Game = {
     
     // ===== GAME LOOP =====
     
+    // ===== KONFIGURASI GAME DARI FIREBASE (/gameConfig — admin/moderator) =====
+    // Nilai-nilai ini menimpa konstanta global saat game dimulai. Kalau admin
+    // mengubah config, pemain berikutnya langsung kena tanpa reload penuh.
+    applyGameConfig(cfg) {
+        if (!cfg) return;
+        const num = (v, def) => (typeof v === 'number' && isFinite(v)) ? v : def;
+        BASE_SPEED = Math.min(20, Math.max(2, num(cfg.baseSpeed, BASE_SPEED)));
+        MAX_SPEED = Math.min(30, Math.max(6, num(cfg.maxSpeed, MAX_SPEED)));
+        RAMP_SPEED_BOOST = Math.min(3, Math.max(0, num(cfg.rampSpeedBoost, RAMP_SPEED_BOOST)));
+        RAMP_INTERVAL = Math.min(3000, Math.max(300, num(cfg.rampInterval, RAMP_INTERVAL)));
+        OBSTACLE_MIN_GAP = Math.min(400, Math.max(60, num(cfg.obstacleMinGap, OBSTACLE_MIN_GAP)));
+        OBSTACLE_MAX_GAP = Math.min(600, Math.max(100, num(cfg.obstacleMaxGap, OBSTACLE_MAX_GAP)));
+        PIT_CHANCE = Math.min(0.5, Math.max(0, num(cfg.pitChance, PIT_CHANCE)));
+        PIT_VOLUME_THRESHOLD = Math.min(0.5, Math.max(0.05, num(cfg.pitVolumeThreshold, PIT_VOLUME_THRESHOLD)));
+        THEME_LENGTH = Math.min(2000, Math.max(300, num(cfg.themeLength, THEME_LENGTH)));
+        THEME_BLEND_ZONE = Math.min(500, Math.max(50, num(cfg.themeBlendZone, THEME_BLEND_ZONE)));
+        // Sinkronkan speed aktif kalau game belum dimulai — mencegah race
+        // async (config resolve setelah resetGame) bikin run pertama pakai
+        // nilai lama.
+        if (this.state !== 'solo' && this.state !== 'multiplayer' && this.state !== 'paused') {
+            this.speed = BASE_SPEED;
+            this.gameSpeed = BASE_SPEED;
+        }
+    },
+
+    // Ambil config terbaru dari Firebase (fire-and-forget, diterapkan async).
+    loadRemoteConfig() {
+        if (typeof DatabaseService === 'undefined' || !DatabaseService.loadGameConfig) return;
+        DatabaseService.loadGameConfig().then((cfg) => this.applyGameConfig(cfg));
+    },
+
     startSolo() {
         this.stopMenuDemo();
         this.showCanvas();
         this.isMultiplayer = false;
+        this.loadRemoteConfig();
         this.resetGame();
         
         // Mulai voice volume detection untuk kontrol lompatan
@@ -558,6 +596,7 @@ const Game = {
         this.stopMenuDemo();
         this.showCanvas();
         this.isMultiplayer = true;
+        this.loadRemoteConfig();
         this.resetGame(seed); // Seed dari multiplayer room untuk deterministic spawn
         // Mulai voice volume detection (countdown 3s cukup untuk mic siap)
         this.startVoiceVolumeDetection();

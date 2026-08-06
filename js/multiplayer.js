@@ -89,12 +89,43 @@ const Multiplayer = {
                 // 🔐 Anonymous auth (identitas pemain) — untuk global leaderboard.
                 // Perlu diaktifkan di Firebase Console: Authentication → Sign-in method → Anonymous.
                 initFirebaseAuth();
+                // 🧹 Bersihkan room yang tidak terpakai (kosong / terlalu lama) —
+                // dijalankan sekali di awal + tiap 60 detik.
+                this.sweepAbandonedRooms();
+                if (!this._sweepTimer) {
+                    this._sweepTimer = setInterval(() => this.sweepAbandonedRooms(), 60000);
+                }
             } else {
                 console.warn('Firebase SDK not loaded');
             }
         } catch(e) {
             console.error('Firebase init error:', e);
         }
+    },
+
+    // ===== CLEANUP DATABASE: hapus room yang sudah tidak terpakai =====
+    // Best-effort — siapa pun yang online bisa nge-sweep (aman karena rules
+    // mengizinkan hapus room kosong / room waiting basi).
+    async sweepAbandonedRooms() {
+        if (!fbInitialized || !database) return;
+        const STALE_WAITING_MS = 30 * 60 * 1000; // room waiting > 30 menit = basi
+        try {
+            const snap = await database.ref('rooms').once('value');
+            const rooms = snap.val() || {};
+            const now = Date.now();
+            Object.keys(rooms).forEach((code) => {
+                const r = rooms[code] || {};
+                const players = r.players || {};
+                const count = Object.keys(players).length;
+                if (count === 0) {
+                    // Tidak ada pemain sama sekali → hapus (host kabur / semua keluar)
+                    database.ref('rooms/' + code).remove().catch(() => {});
+                } else if (r.status === 'waiting' && r.createdAt && now - r.createdAt > STALE_WAITING_MS) {
+                    // Room waiting yang dibiarkan > 30 menit → hapus
+                    database.ref('rooms/' + code).remove().catch(() => {});
+                }
+            });
+        } catch(e) { /* best-effort — jangan ganggu gameplay */ }
     },
     
     generateRoomCode() {
@@ -345,6 +376,12 @@ const Multiplayer = {
                 this.cleanup();
                 return;
             }
+            // Auto-hapus room yang sudah kosong (semua pemain pergi / disconnect)
+            const livePlayers = data.players || {};
+            if (Object.keys(livePlayers).length === 0) {
+                this.roomRef.remove().catch(() => {});
+                return;
+            }
             this.currentRoomData = data;
             this.updateRoomUI(data);
             
@@ -419,6 +456,10 @@ const Multiplayer = {
     cleanup() {
         if (this.roomRef) {
             this.roomRef.off();
+            // 🔑 Cancel onDisconnect room — kalau tidak, room yang host-nya sudah
+            // keluar dengan sopan (host dipindah ke pemain lain) tetap akan
+            // TERHAPUS total begitu koneksi host lama berakhir. Ini bug lama.
+            this.roomRef.onDisconnect().cancel();
             this.roomRef = null;
         }
         if (this.playerRef) {
@@ -435,6 +476,9 @@ const Multiplayer = {
     leaveRoom() {
         // Remove player from room
         if (this.roomRef && this.playerId) {
+            // Cancel dulu onDisconnect host supaya room tidak terhapus nanti
+            // saat koneksi browser ini berakhir setelah keluar dengan sopan.
+            this.roomRef.onDisconnect().cancel();
             this.roomRef.child('players/' + this.playerId).remove();
             this.roomRef.child('playerOrder').transaction((order) => {
                 if (!order) return null;
@@ -767,6 +811,10 @@ function refreshAccountUI() {
         modSection.style.display = (role === 'admin' || role === 'moderator') ? 'block' : 'none';
         const adminRoleBox = document.getElementById('adminRoleBox');
         if (adminRoleBox) adminRoleBox.style.display = (role === 'admin') ? 'block' : 'none';
+        if (role === 'admin' || role === 'moderator') {
+            // Muat config game terbaru begitu panel moderasi tampil
+            if (typeof loadGameConfigForm === 'function') loadGameConfigForm();
+        }
     }
 
     // Pastikan panel logged-in ikut refresh (dipakai dari onAuthStateChanged,
@@ -1108,6 +1156,84 @@ async function applyRole() {
         document.getElementById('modUid').value = '';
     } else {
         showStatusEl(msg, '❌ ' + res.msg, 'error');
+    }
+}
+
+// ===== TAB MODERASI (ROLES / GAME SETTINGS) =====
+function switchModTab(tab) {
+    const rolesTab = document.getElementById('modTabRoles');
+    const gameTab = document.getElementById('modTabGame');
+    const rolesPanel = document.getElementById('modPanelRoles');
+    const gamePanel = document.getElementById('modPanelGame');
+    if (rolesTab) rolesTab.classList.toggle('active', tab === 'roles');
+    if (gameTab) gameTab.classList.toggle('active', tab === 'game');
+    if (rolesPanel) rolesPanel.style.display = tab === 'roles' ? 'block' : 'none';
+    if (gamePanel) gamePanel.style.display = tab === 'game' ? 'block' : 'none';
+    if (tab === 'game') loadGameConfigForm();
+}
+
+// ===== GAME CONFIG (admin/moderator — tersimpan di Firebase /gameConfig) =====
+// Key config → ID input di form PROFILE
+const _GAME_CONFIG_FIELD_MAP = {
+    cfgBaseSpeed: 'baseSpeed',
+    cfgMaxSpeed: 'maxSpeed',
+    cfgRampSpeedBoost: 'rampSpeedBoost',
+    cfgRampInterval: 'rampInterval',
+    cfgObstacleMinGap: 'obstacleMinGap',
+    cfgObstacleMaxGap: 'obstacleMaxGap',
+    cfgPitChance: 'pitChance',
+    cfgPitVolumeThreshold: 'pitVolumeThreshold',
+    cfgThemeLength: 'themeLength',
+    cfgThemeBlendZone: 'themeBlendZone'
+};
+
+async function loadGameConfigForm() {
+    const msg = document.getElementById('gameConfigMsg');
+    if (!msg) return;
+    if (!window.DatabaseService || typeof window.DatabaseService.loadGameConfig !== 'function') return;
+    const cfg = await window.DatabaseService.loadGameConfig();
+    Object.keys(_GAME_CONFIG_FIELD_MAP).forEach((inputId) => {
+        const el = document.getElementById(inputId);
+        if (el) el.value = cfg[_GAME_CONFIG_FIELD_MAP[inputId]];
+    });
+}
+
+async function saveGameConfigFromForm() {
+    const msg = document.getElementById('gameConfigMsg');
+    if (!msg) return;
+    if (!window.DatabaseService || typeof window.DatabaseService.saveGameConfig !== 'function') {
+        showStatusEl(msg, 'Database belum siap.', 'error');
+        return;
+    }
+    const cfg = {};
+    Object.keys(_GAME_CONFIG_FIELD_MAP).forEach((inputId) => {
+        const el = document.getElementById(inputId);
+        cfg[_GAME_CONFIG_FIELD_MAP[inputId]] = el ? parseFloat(el.value) : NaN;
+    });
+    if (window.Toast) window.Toast.loading('Menyimpan konfigurasi...');
+    const res = await window.DatabaseService.saveGameConfig(cfg);
+    if (window.Toast) window.Toast.hideLoading();
+    if (res.ok) {
+        showStatusEl(msg, 'Konfigurasi tersimpan! Berlaku untuk semua pemain di game berikutnya.', 'success');
+        if (window.Toast) window.Toast.success('Game config disimpan!');
+    } else {
+        showStatusEl(msg, 'Gagal simpan: ' + res.msg, 'error');
+    }
+}
+
+async function resetGameConfigFromForm() {
+    const msg = document.getElementById('gameConfigMsg');
+    if (!msg) return;
+    if (!window.DatabaseService || typeof window.DatabaseService.resetGameConfig !== 'function') {
+        showStatusEl(msg, 'Database belum siap.', 'error');
+        return;
+    }
+    const res = await window.DatabaseService.resetGameConfig();
+    if (res.ok) {
+        showStatusEl(msg, 'Konfigurasi dikembalikan ke default.', 'success');
+        loadGameConfigForm();
+    } else {
+        showStatusEl(msg, 'Gagal reset: ' + res.msg, 'error');
     }
 }
 

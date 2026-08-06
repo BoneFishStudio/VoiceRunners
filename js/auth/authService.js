@@ -53,6 +53,24 @@
             .catch(function () { return fallback; });
     }
 
+    // ===== Auto-register role untuk akun Email/Password =====
+    // Setiap user yang login lewat Email/Password otomatis masuk ke node
+    // /userRoles/{uid} = "user" (kalau belum ada) supaya gampang diubah
+    // role-nya oleh admin. Security Rules menjamin user TIDAK bisa
+    // menaikkan role dirinya sendiri (hanya boleh menulis 'user').
+    function ensureUserRole(uid) {
+        var db = global.FirebaseCore.db;
+        if (!db || !uid) return Promise.resolve();
+        return db.ref('userRoles/' + uid).once('value')
+            .then(function (snap) {
+                if (snap.exists()) return;
+                return db.ref('userRoles/' + uid).set('user').catch(function (e) {
+                    console.warn('[authService] Auto-register role gagal:', e.message);
+                });
+            })
+            .catch(function () { /* best-effort */ });
+    }
+
     var _inited = false;
 
     // ===== Session: onAuthStateChanged (persist + auto login/logout) =====
@@ -69,6 +87,11 @@
                 state.uid = user.uid;
                 state.ready = true;
                 state.emailBlocked = false;
+                // Akun Email/Password → pastikan punya entry role di /userRoles
+                // (default 'user') supaya mudah di-manage oleh admin.
+                if (!user.isAnonymous) {
+                    ensureUserRole(user.uid);
+                }
                 // Kalau akun email belum diverifikasi → blokir akses main
                 if (!user.isAnonymous && user.email && !user.emailVerified) {
                     state.emailBlocked = true;
