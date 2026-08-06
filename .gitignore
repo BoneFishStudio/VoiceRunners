@@ -2,6 +2,10 @@
 # Vercel local config — berisi project ID & org ID
 .vercel/
 
+# Dokumen internal game system (Security Rules Firebase, dsb.) —
+# file ini PRIBADI, simpan lokal / di luar repo supaya tidak bocor.
+docs/
+
 # Environment variables (kalau nanti pakai)
 .env
 .env.local
