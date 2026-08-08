@@ -1,5 +1,18 @@
 /* ============================
    MULTIPLAYER.JS - Firebase Multiplayer
+   ============================
+   👥 SKEMA DATA FIREBASE (RTDB):
+   - /rooms/{code}/players/{playerId}  → data live tiap pemain
+   - /rooms/{code}/kicks/{playerId}    → flag "pemain dikeluarkan moderator"
+   - /playerRoomIndex/{playerId}       → index terbalik pemain → room (join/leave/kick/sweep)
+
+   🎖️ KEMAMPUAN FINAL PER ROLE (dokumentasi resmi — lihat juga README):
+   - anon      : main solo/multiplayer + submit skor (ber-label Guest)
+   - user      : sama seperti anon + skor permanen dengan nama akun
+   - moderator : semua kemampuan user + hapus entry leaderboard mencurigakan
+                 + kick pemain dari room multiplayer
+   - admin     : semua kemampuan moderator + assign/cabut role
+                 + atur gameConfig (keseimbangan game)
    ============================ */
 
 // Firebase Configuration
@@ -123,7 +136,14 @@ const Multiplayer = {
                 } else if (r.status === 'waiting' && r.createdAt && now - r.createdAt > STALE_WAITING_MS) {
                     // Room waiting yang dibiarkan > 30 menit → hapus
                     database.ref('rooms/' + code).remove().catch(() => {});
+                } else {
+                    return; // room masih hidup
                 }
+                // Room terhapus → bersihkan index pemain→room yang menunjuk ke sana,
+                // supaya /playerRoomIndex tidak menjadi sampah selamanya.
+                Object.keys(players).forEach((pid) => {
+                    if (pid !== '_stale') this.removeRoomIndex(pid);
+                });
             });
         } catch(e) { /* best-effort — jangan ganggu gameplay */ }
     },
@@ -139,6 +159,27 @@ const Multiplayer = {
     
     generatePlayerId() {
         return 'player_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+    },
+
+    // ===== INDEX TERBALIK PEMain→room (/playerRoomIndex) =====
+    // Dipakai moderator untuk "kick pemain dari room": tahu roomId dari
+    // target tanpa scan seluruh /rooms. Di-set saat join/create room,
+    // di-hapus saat leave / room dibersihkan / pemain di-kick.
+    updateRoomIndex(roomCode) {
+        if (!database || !this.playerId || !roomCode) return;
+        const idx = database.ref('playerRoomIndex/' + this.playerId);
+        idx.set({
+            roomId: roomCode,
+            ownerUid: authUid || '',
+            joinedAt: Date.now()
+        }).catch(() => {});
+        // Kalau tiba-tiba disconnect / browser ketutup → entry index ikut terhapus
+        idx.onDisconnect().remove();
+    },
+
+    removeRoomIndex(playerId) {
+        if (!database || !playerId) return;
+        database.ref('playerRoomIndex/' + playerId).remove().catch(() => {});
     },
     
     async createRoom(password = '') {
@@ -196,6 +237,10 @@ const Multiplayer = {
             
             this.roomRef = database.ref('rooms/' + this.roomCode);
             this.playerRef = database.ref('rooms/' + this.roomCode + '/players/' + this.playerId);
+            
+            // Index terbalik pemain → room (/playerRoomIndex/{playerId} = {roomId, ownerUid})
+            // Dipakai moderator utk tau pemain lagi ada di room mana (kick tanpa scan semua room).
+            this.updateRoomIndex(this.roomCode);
             
             // Listen for changes
             this.setupRoomListener();
@@ -287,6 +332,10 @@ const Multiplayer = {
                 return order;
             });
             
+            // Index terbalik pemain → room — dibuat SETELAH player berhasil masuk,
+            // supaya tidak ada index nyasar kalau join malah gagal
+            this.updateRoomIndex(code);
+            
             // Listen for changes
             this.setupRoomListener();
             
@@ -325,12 +374,19 @@ const Multiplayer = {
             
             const div = document.createElement('div');
             div.className = 'mp-player';
+            // Tombol KICK hanya tampil utk admin/moderator, dan hanya utk pemain LAIN
+            // (tidak untuk diri sendiri). Area sentuh 40x40px biar nyaman di HP —
+            // secara visual icon-nya kecil, tapi tap tetap mudah.
+            const kickBtn = (typeof isCurrentUserMod === 'function' && isCurrentUserMod() && pid !== this.playerId)
+                ? `<button class="mp-kick-btn" onclick="kickPlayer('${pid}')" title="Keluarkan pemain dari room" aria-label="Kick ${escapeHtml(p.name || 'pemain')}"><svg class="lb-icon"><use href="#icon-user-minus"/></svg></button>`
+                : '';
             div.innerHTML = `
                 <span class="player-icon">${pid === data.host
                     ? '<svg class="lb-icon"><use href="#icon-trophy"/></svg>'
                     : '<svg class="lb-icon"><use href="#icon-user"/></svg>'}</span>
-                <span class="player-name">${p.name || 'Pemain'}</span>
+                <span class="player-name">${escapeHtml(p.name || 'Pemain')}</span>
                 <span class="player-status">${p.ready ? 'Siap' : '...'}</span>
+                ${kickBtn}
             `;
             playerList.appendChild(div);
         });
@@ -439,15 +495,22 @@ const Multiplayer = {
         }
     },
     
-    async updatePlayerState(score, distance, lives, alive) {
+    async updatePlayerState(score, distance, lives, alive, jumpInfo) {
         if (!this.playerRef || !this.roomRef) return;
         try {
-            await this.playerRef.update({
+            // jumpInfo = { isJumping: bool, jumpProgress: 0-1 (tinggi lompat relatif ke apex max) }
+            // dikirim dalam payload yang sama — tidak ada request terpisah.
+            const payload = {
                 score: score,
                 distance: distance,
                 lives: lives,
                 alive: alive
-            });
+            };
+            if (jumpInfo) {
+                payload.isJumping = !!jumpInfo.isJumping;
+                payload.jumpProgress = Math.min(1, Math.max(0, Number(jumpInfo.jumpProgress) || 0));
+            }
+            await this.playerRef.update(payload);
         } catch(e) {
             console.error('Update state error:', e);
         }
@@ -466,6 +529,10 @@ const Multiplayer = {
             this.playerRef.onDisconnect().cancel();
             this.playerRef = null;
         }
+        // Bersihkan index pemain→room kalau cleanup karena keluar room
+        this.removeRoomIndex(this.playerId);
+        // Reset guard autofix host — jangan menempel antar sesi room yang beda
+        this._lastHostFix = null;
         this.currentRoomData = null;
         this.roomCode = null;
         this.isHost = false;
@@ -498,6 +565,62 @@ const Multiplayer = {
         }
         this.cleanup();
         this.showMpPanel('create');
+    },
+
+    // ===== 🦵 KICK PEMAIN DARI ROOM (hanya admin/moderator) =====
+    // Menghapus target dari /rooms/{code}/players + playerOrder, menandai
+    // /rooms/{code}/kicks/{target} supaya client target otomatis tahu
+    // dirinya di-kick (bukan sekadar room hilang), dan membersihkan
+    // /playerRoomIndex/{target}. Di-enforce juga di Security Rules.
+    async kickPlayer(targetPlayerId) {
+        if (typeof isCurrentUserMod === 'function' && !isCurrentUserMod()) {
+            this.showStatus('Kamu bukan admin/moderator.', 'error');
+            return false;
+        }
+        if (!this.roomRef || !this.roomCode || !targetPlayerId) return false;
+        if (targetPlayerId === this.playerId) return false;
+        const data = this.currentRoomData;
+        if (!data || !data.players || !data.players[targetPlayerId]) {
+            this.showStatus('Pemain sudah tidak ada di room.', 'error');
+            return false;
+        }
+        const myName = (data.players[this.playerId] || {}).name || 'Moderator';
+        try {
+            await this.roomRef.child('players/' + targetPlayerId).remove();
+            await this.roomRef.child('playerOrder').transaction((order) => {
+                if (!order) return null;
+                return order.filter(id => id !== targetPlayerId);
+            });
+            await this.roomRef.child('kicks/' + targetPlayerId).set({
+                kickedAt: Date.now(),
+                kickerName: String(myName).slice(0, 20)
+            });
+            // Bersihkan index pemain→room milik target
+            this.removeRoomIndex(targetPlayerId);
+            this.showStatus('Pemain dikeluarkan dari room.', 'success');
+            return true;
+        } catch(e) {
+            console.error('Kick error:', e);
+            this.showStatus('Gagal kick: ' + e.message, 'error');
+            return false;
+        }
+    },
+
+    // Dipanggil dari sisi client yang di-kick: kembalikan ke Main Menu
+    // dengan pesan jelas (bukan sekadar "room hilang" yang ambigu).
+    handleKicked() {
+        // Hentikan game kalau sedang berjalan (mid-game kick)
+        if (this.gameStarted && typeof Game !== 'undefined' && Game && Game.state !== 'menu') {
+            showMainMenu();
+        }
+        this.cleanup();
+        document.querySelectorAll('.mp-panel').forEach(p => p.style.display = 'none');
+        if (typeof showMainMenu === 'function') showMainMenu();
+        if (window.Toast && typeof window.Toast.error === 'function') {
+            window.Toast.error('Kamu dikeluarkan dari room oleh moderator.');
+        } else {
+            alert('Kamu dikeluarkan dari room oleh moderator.');
+        }
     }
 };
 
@@ -1237,4 +1360,11 @@ function startMultiplayerGame() {
 function leaveRoom() {
     Multiplayer.leaveRoom();
     document.getElementById('mpWaiting').style.display = 'none';
+}
+
+// Tombol Kick di lobby room (hanya tampil utk admin/moderator — enforced
+// di UI updateRoomUI + Security Rules). Konfirmasi dulu biar tidak salah tap.
+function kickPlayer(playerId) {
+    if (!confirm('Keluarkan pemain ini dari room?')) return;
+    Multiplayer.kickPlayer(playerId);
 }

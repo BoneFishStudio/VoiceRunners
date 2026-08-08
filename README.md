@@ -13,6 +13,23 @@
 
 ---
 
+## 🎖️ SISTEM ROLE & KEMAMPUAN FINAL
+
+Setiap pemain punya **role** yang menentukan kemampuan. Role disimpan di Firebase `/userRoles/{uid}` dan di-enforce ganda: di UI **dan** di Security Rules (server). Default tanpa entry: **anon** (guest anonim) atau **user** (akun email permanen).
+
+| Role | Main solo/multiplayer | Submit skor | Hapus entry leaderboard | Kick pemain dari room | Assign/cabut role | Atur `gameConfig` |
+|------|:---:|:---:|:---:|:---:|:---:|:---:|
+| **anon** (Guest) | ✅ | ✅ (ber-label Guest) | — | — | — | — |
+| **user** (akun) | ✅ | ✅ (nama akun, permanen) | — | — | — | — |
+| **moderator** | ✅ | ✅ | ✅ (tandai mencurigakan → hapus) | ✅ | — | — |
+| **admin** | ✅ | ✅ | ✅ | ✅ | ✅ (assign/cabut siapa pun) | ✅ (keseimbangan game) |
+
+Detail implementasi:
+- **Kick pemain dari room**: tombol ✂️ di lobby room (hanya tampil utk admin/moderator). Menghapus pemain dari `/rooms/{code}/players` + `playerOrder`, menandai `/rooms/{code}/kicks/{playerId}`, dan membersihkan index `/playerRoomIndex/{playerId}` — client target otomatis kembali ke Main Menu dengan pesan *"Kamu dikeluarkan dari room oleh moderator"*.
+- **Index pemain→room**: `/playerRoomIndex/{playerId}` = `{roomId, ownerUid, joinedAt}` — di-set saat join/create room, dihapus saat keluar / di-kick / room di-sweep (auto-cleanup). Dipakai supaya moderator tahu room mana yang dihuni pemain tanpa scan semua room.
+- **Auto-fix host**: kalau host di-kick atau disconnect, host otomatis dipindah ke pemain pertama yang tersisa.
+- **Bootstrap admin pertama**: set manual di Firebase Console → Realtime Database → `/userRoles` → tulis `"<uid-pemain>" : "admin"`. (Panduan setup lengkap ada di `docs/`.)
+
 ## ✨ FITUR UTAMA
 
 | Fitur | Deskripsi |

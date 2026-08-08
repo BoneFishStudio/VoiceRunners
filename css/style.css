@@ -759,6 +759,39 @@ html, body {
     font-size: 0.8rem;
 }
 
+/* Tombol Kick pemain (admin/moderator) — area sentuh 40x40px biar nyaman
+   di HP, walau icon-nya tampil kecil. Ditaruh paling kanan dari baris
+   pemain, tidak overlapp dengan status/ikon. */
+.mp-kick-btn {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    margin-left: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.3s, border-color 0.3s, transform 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mp-kick-btn .lb-icon {
+    width: 1.1em;
+    height: 1.1em;
+}
+
+.mp-kick-btn:hover,
+.mp-kick-btn:active {
+    background: rgba(255,68,68,0.15);
+    border-color: var(--danger);
+    transform: scale(0.96);
+}
+
 .mp-players-count {
     font-family: 'Press Start 2P', monospace;
     font-size: 0.9rem;
