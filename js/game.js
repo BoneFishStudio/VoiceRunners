@@ -1477,6 +1477,7 @@ const Game = {
         if (!overlay) return;
         overlay.classList.remove('overlay-hidden');
         overlay.classList.add('overlay-active');
+        UI_TRANSITION.animate(overlay, 'ui-flip-enter-right', UI_TRANSITION.flipEnterMs);
         
         // Pause game jika sedang bermain
         if (this.state === 'solo' || this.state === 'multiplayer') {
@@ -1926,6 +1927,9 @@ const Game = {
         document.getElementById('finalScore').textContent = this.score;
         document.getElementById('finalDistance').textContent = Math.floor(this.distance) + ' m';
         document.getElementById('gameOverScreen').classList.remove('overlay-hidden');
+        // 3D UI: box statistik jatuh masuk + tombol aksi muncul berurutan
+        UI_TRANSITION.animate(document.getElementById('gameOverScreen'), 'overlay-enter-fall', 450);
+        UI_TRANSITION.stagger(document.querySelector('#gameOverScreen .go-actions'), 80, 350);
         
         // Auto-fill name from saved
         const savedName = localStorage.getItem('voiceRunner_playerName');
@@ -3387,6 +3391,14 @@ const Game = {
         });
         
         document.getElementById('winScreen').classList.remove('overlay-hidden');
+        // 3D UI: box hasil masuk meriah + tiap ranking stagger (juara 1 lebih besar)
+        UI_TRANSITION.animate(document.getElementById('winScreen'), 'win-enter', 500);
+        UI_TRANSITION.stagger(resultsDiv, 90, 400);
+        const champion = resultsDiv.querySelector('.mp-result-item');
+        if (champion) {
+            champion.classList.add('mp-win-big');
+            setTimeout(() => champion.classList.remove('mp-win-big'), 1000);
+        }
         
         if (this.mpUpdateInterval) {
             clearInterval(this.mpUpdateInterval);
@@ -3400,6 +3412,8 @@ const Game = {
         if (this.state === 'solo' || this.state === 'multiplayer') {
             this.state = 'paused';
             document.getElementById('pauseMenu').classList.remove('overlay-hidden');
+            // 3D UI: pause terbang masuk dari kedalaman
+            UI_TRANSITION.animate(document.getElementById('pauseMenu'), 'overlay-enter-depth', 300);
             // Isi statistik di menu pause
             const pd = document.getElementById('pauseDistance');
             const ps = document.getElementById('pauseScore');
@@ -3522,7 +3536,11 @@ function showMainMenu() {
     document.getElementById('exitConfirm').classList.add('overlay-hidden');
     document.getElementById('adPlaceholder').classList.add('overlay-hidden');
     
-    document.getElementById('mainMenu').classList.add('active');
+    const menu = document.getElementById('mainMenu');
+    menu.classList.add('active');
+    // 3D UI: menu kembali masuk dari sisi kiri
+    UI_TRANSITION.animate(menu, 'ui-flip-enter-left', UI_TRANSITION.flipEnterMs);
+    
     Game.state = 'menu';
     
     // Mainkan musik lagi di menu
@@ -3538,9 +3556,12 @@ function showMainMenu() {
 }
 
 function showModeSelect() {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('multiplayerScreen').classList.remove('active');
-    document.getElementById('modeSelect').classList.add('active');
+    // Flip 3D: multiplayer keluar (kanan) → mode select masuk (kiri)
+    UI_TRANSITION.flipScreen(
+        document.getElementById('multiplayerScreen'),
+        document.getElementById('modeSelect'),
+        { back: true }
+    );
     Game.state = 'modeSelect';
 }
 
@@ -3553,20 +3574,30 @@ function startSolo() {
 }
 
 function showMultiplayer() {
-    document.getElementById('modeSelect').classList.remove('active');
-    document.getElementById('multiplayerScreen').classList.add('active');
+    // Flip 3D: mode select keluar (kiri) → multiplayer lobby masuk (kanan)
+    UI_TRANSITION.flipScreen(
+        document.getElementById('modeSelect'),
+        document.getElementById('multiplayerScreen')
+    );
 }
 
 // Leaderboard
 function showLeaderboard() {
-    document.getElementById('mainMenu').classList.remove('active');
-    document.getElementById('leaderboardScreen').classList.add('active');
+    // Flip 3D dari main menu → leaderboard
+    UI_TRANSITION.flipScreen(
+        document.getElementById('mainMenu'),
+        document.getElementById('leaderboardScreen')
+    );
     updateLeaderboard();
 }
 
 function hideLeaderboard() {
-    document.getElementById('leaderboardScreen').classList.remove('active');
-    document.getElementById('mainMenu').classList.add('active');
+    // Flip 3D kembali ke main menu
+    UI_TRANSITION.flipScreen(
+        document.getElementById('leaderboardScreen'),
+        document.getElementById('mainMenu'),
+        { back: true }
+    );
 }
 
 // Heuristik anti-cheat (tampilan saja, utk ditinjau moderator):
@@ -3658,8 +3689,11 @@ function switchLbTab(tab) {
 
 // Settings
 function showSettings() {
-    document.getElementById('mainMenu').classList.remove('active');
-    document.getElementById('settingsScreen').classList.add('active');
+    // Flip 3D dari main menu → settings
+    UI_TRANSITION.flipScreen(
+        document.getElementById('mainMenu'),
+        document.getElementById('settingsScreen')
+    );
     
     // Load settings
     const saved = localStorage.getItem('voiceRunner_settings');
@@ -3680,8 +3714,12 @@ function showSettings() {
 }
 
 function hideSettings() {
-    document.getElementById('settingsScreen').classList.remove('active');
-    document.getElementById('mainMenu').classList.add('active');
+    // Flip 3D kembali ke main menu
+    UI_TRANSITION.flipScreen(
+        document.getElementById('settingsScreen'),
+        document.getElementById('mainMenu'),
+        { back: true }
+    );
 }
 
 function toggleMusicSetting() {
@@ -3749,6 +3787,101 @@ function closeAd() {
     document.getElementById('adPlaceholder').classList.add('overlay-hidden');
     // Setelah "menonton iklan" → lanjut dari titik kematian
     Game.continueFromDeath();
+}
+
+// ==================================================================
+// UI TRANSITIONS 3D — menu & overlay (BUKAN gameplay canvas).
+// Tetap memakai mekanisme classList show/hide yang sudah ada
+// (overlay-hidden / active); hanya menambah class animasi di atasnya.
+// will-change ditambah/dihapus otomatis HANYA saat animasi aktif.
+// ==================================================================
+const UI_TRANSITION = {
+    flipExitMs: 250,
+    flipEnterMs: 300,
+    fadeMs: 250,
+
+    // Tambah class animasi + will-change. Class ENTER dibuat persisten
+    // (dihapus saat layar hidden lewat mekanisme lama) supaya animasi
+    // dasar container (fadeInUp dll) tidak restart → mencegah efek
+    // "animasi ganda" saat class sementara dilepas. will-change
+    // (layer GPU) SELALU dilepas setelah animasi selesai.
+    animate(el, cls, duration) {
+        if (!el) return;
+        el.classList.remove(cls);
+        void el.offsetWidth; // force reflow → animasi restart tiap dipanggil
+        el.classList.add('ui-animating', cls);
+        setTimeout(() => {
+            el.classList.remove('ui-animating');
+        }, duration + 60);
+    },
+
+    // Anak elemen muncul berurutan (stagger) dengan delay antar item.
+    stagger(el, step, duration) {
+        if (!el || !el.children.length) return;
+        step = step || 80;
+        duration = duration || 350;
+        const total = (el.children.length - 1) * step + duration;
+        el.classList.add('stagger-child');
+        void el.offsetWidth; // force reflow → animasi restart tiap dipanggil
+        el.classList.add('play');
+        setTimeout(() => {
+            el.classList.remove('stagger-child', 'play');
+        }, total + 80);
+    },
+
+    // Flip keluar layar fromEl → tampilkan toEl (masuk dari sisi
+    // berlawanan). back=true = arah kembali. onEnter opsional untuk
+    // animasi masuk custom (misal auth: fade, bukan flip 3D).
+    flipScreen(fromEl, toEl, opts) {
+        opts = opts || {};
+        const back = !!opts.back;
+        const exitCls = back ? 'ui-flip-exit-right' : 'ui-flip-exit-left';
+        const enterCls = back ? 'ui-flip-enter-left' : 'ui-flip-enter-right';
+        const fromVisible = fromEl && fromEl.classList.contains('active');
+
+        if (!fromVisible) {
+            if (opts.onEnter) { opts.onEnter(); return; }
+            if (toEl) {
+                toEl.classList.add('active');
+                this.animate(toEl, enterCls, this.flipEnterMs);
+            }
+            return;
+        }
+        if (fromEl.classList.contains('ui-animating')) return; // lagi animasi
+
+        fromEl.classList.add('ui-animating', exitCls);
+        setTimeout(() => {
+            fromEl.classList.remove('active', 'ui-animating', exitCls);
+            if (opts.onEnter) { opts.onEnter(); return; }
+            if (toEl) {
+                toEl.classList.add('active');
+                this.animate(toEl, enterCls, this.flipEnterMs);
+            }
+        }, this.flipExitMs);
+    },
+
+    // Fade-out ringan — untuk layar grup fade (auth/verification),
+    // tanpa transform 3D sama sekali.
+    fadeExit(fromEl, cb) {
+        if (!fromEl || !fromEl.classList.contains('active')) {
+            if (cb) cb();
+            return;
+        }
+        fromEl.classList.add('ui-animating', 'screen-fade-exit');
+        setTimeout(() => {
+            fromEl.classList.remove('active', 'ui-animating', 'screen-fade-exit');
+            if (cb) cb();
+        }, this.fadeMs);
+    }
+};
+
+// Wrapper global biar bisa dipanggil dari multiplayer.js juga
+function uiFlipScreen(fromId, toId, opts) {
+    UI_TRANSITION.flipScreen(
+        document.getElementById(fromId),
+        document.getElementById(toId),
+        opts
+    );
 }
 
 // ===== INIT =====

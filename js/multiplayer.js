@@ -1041,8 +1041,19 @@ function refreshAuthStatus() {
 // ============================================================
 
 function showAuth(tab) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('authScreen').classList.add('active');
+    // Main menu flip keluar → authScreen masuk dengan FADE ringan
+    // (grup fade: form dengan input teks, jangan pakai transform 3D)
+    UI_TRANSITION.flipScreen(
+        document.getElementById('mainMenu'),
+        null,
+        {
+            onEnter: () => {
+                const auth = document.getElementById('authScreen');
+                auth.classList.add('active');
+                UI_TRANSITION.animate(auth, 'screen-fade-enter', UI_TRANSITION.fadeMs);
+            }
+        }
+    );
     if (typeof Game !== 'undefined') Game.state = 'menu';
     switchAuthTab(tab || 'login');
     refreshAuthStatus();
@@ -1052,8 +1063,12 @@ function showAuth(tab) {
 }
 
 function hideAuth() {
-    document.getElementById('authScreen').classList.remove('active');
-    document.getElementById('mainMenu').classList.add('active');
+    // Auth keluar dengan fade ringan → main menu masuk flip 3D
+    UI_TRANSITION.fadeExit(document.getElementById('authScreen'), () => {
+        const menu = document.getElementById('mainMenu');
+        menu.classList.add('active');
+        UI_TRANSITION.animate(menu, 'ui-flip-enter-left', UI_TRANSITION.flipEnterMs);
+    });
     if (typeof refreshAccountUI === 'function') refreshAccountUI();
 }
 
@@ -1130,8 +1145,14 @@ async function submitRegister() {
 
 // ===== EMAIL VERIFICATION SCREEN =====
 async function showVerificationScreen(user) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('verificationScreen').classList.add('active');
+    // Layar aktif (auth/menu) keluar dengan fade ringan → verifikasi masuk fade.
+    // Grup fade: TANPA transform 3D (spec layar verifikasi email).
+    const vScreen = document.getElementById('verificationScreen');
+    const activeScreen = document.querySelector('.screen.active');
+    UI_TRANSITION.fadeExit(activeScreen, () => {
+        vScreen.classList.add('active');
+        UI_TRANSITION.animate(vScreen, 'screen-fade-enter', UI_TRANSITION.fadeMs);
+    });
     const emailEl = document.getElementById('verifyEmail');
     const u = user || (firebase.auth() && firebase.auth().currentUser);
     if (emailEl && u) emailEl.textContent = u.email || 'email kamu';
@@ -1155,7 +1176,9 @@ async function checkVerificationStatus() {
         showStatusEl(msgEl, 'Email terverifikasi! Menuju main menu...', 'success');
         setTimeout(() => {
             document.getElementById('verificationScreen').classList.remove('active');
-            document.getElementById('mainMenu').classList.add('active');
+            const menu = document.getElementById('mainMenu');
+            menu.classList.add('active');
+            UI_TRANSITION.animate(menu, 'ui-flip-enter-left', UI_TRANSITION.flipEnterMs);
             if (window.Toast) window.Toast.success('Selamat datang! Akunmu aktif.');
         }, 1200);
     } else {
@@ -1167,7 +1190,9 @@ async function logoutAndGuest() {
     // Keluar dari akun email → lanjut sebagai Guest (boleh main)
     await logoutAccount();
     document.getElementById('verificationScreen').classList.remove('active');
-    document.getElementById('mainMenu').classList.add('active');
+    const menu = document.getElementById('mainMenu');
+    menu.classList.add('active');
+    UI_TRANSITION.animate(menu, 'ui-flip-enter-left', UI_TRANSITION.flipEnterMs);
 }
 
 // ===== EDIT PROFIL (nama + foto) =====
