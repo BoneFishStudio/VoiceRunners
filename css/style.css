@@ -2591,3 +2591,138 @@ input, select { touch-action: manipulation; }
     #hud { padding-top: calc(1rem + env(safe-area-inset-top)); }
     .screen.active { padding-bottom: calc(env(safe-area-inset-bottom)); }
 }
+
+/* ==================================================================
+   UI TRANSITIONS 3D (menu & overlay saja — BUKAN gameplay canvas)
+   3D ringan via CSS transforms (perspective/rotateY/translateZ),
+   di-render native GPU browser. will-change hanya dipasang saat
+   animasi aktif (dikelola via class dari JS), supaya layer GPU
+   tidak dialokasikan terus-menerus untuk elemen yang diam.
+   ================================================================== */
+
+/* Perspective diterapkan per layar penuh → konten anak bisa diputar 3D */
+#mainMenu, #modeSelect, #multiplayerScreen, #leaderboardScreen,
+#settingsScreen, #pauseMenu, #gameOverScreen, #winScreen,
+#instructionsOverlay {
+    perspective: 1200px;
+}
+
+/* will-change HANYA saat animasi aktif (class ditambah/dihapus via JS) */
+.ui-animating > *,
+.stagger-child.play > * {
+    will-change: transform, opacity;
+}
+
+/* --- Card flip masuk (tujuan masuk dari sisi berlawanan) --- */
+.ui-flip-enter-left  > * { animation: uiFlipInLeft  0.3s  cubic-bezier(0.4, 0, 0.2, 1) both; }
+.ui-flip-enter-right > * { animation: uiFlipInRight 0.3s  cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* --- Card flip keluar --- */
+.ui-flip-exit-left   > * { animation: uiFlipOutLeft  0.25s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.ui-flip-exit-right  > * { animation: uiFlipOutRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* --- Pause: terbang masuk dari kedalaman --- */
+.overlay-enter-depth > * { animation: uiFlyIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* --- Game Over: box statistik jatuh + berputar ringan --- */
+.overlay-enter-fall > * { animation: uiFallIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* --- Win Screen: masuk meriah --- */
+.win-enter > * { animation: uiWinIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* Juara 1 masuk dengan efek sedikit lebih besar */
+.mp-result-item.mp-win-big { animation: uiChampionPop 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both; }
+
+/* --- Stagger: anak elemen muncul berurutan (tombol aksi, ranking) --- */
+.stagger-child > * { opacity: 0; }
+.stagger-child.play > * { animation: uiStaggerIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.stagger-child.play > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-child.play > *:nth-child(2) { animation-delay: 80ms; }
+.stagger-child.play > *:nth-child(3) { animation-delay: 160ms; }
+.stagger-child.play > *:nth-child(4) { animation-delay: 240ms; }
+.stagger-child.play > *:nth-child(5) { animation-delay: 320ms; }
+
+/* --- Fade ringan (auth/verification — TANPA transform 3D) --- */
+.screen-fade-exit  { animation: uiScreenFadeOut 0.25s ease-out both; }
+.screen-fade-enter { animation: uiScreenFadeIn  0.25s ease-out both; }
+
+@keyframes uiFlipInLeft {
+    from { transform: rotateY(-90deg); opacity: 0; }
+    to   { transform: rotateY(0deg);   opacity: 1; }
+}
+
+@keyframes uiFlipInRight {
+    from { transform: rotateY(90deg); opacity: 0; }
+    to   { transform: rotateY(0deg);  opacity: 1; }
+}
+
+@keyframes uiFlipOutLeft {
+    from { transform: rotateY(0deg);   opacity: 1; }
+    to   { transform: rotateY(-90deg); opacity: 0; }
+}
+
+@keyframes uiFlipOutRight {
+    from { transform: rotateY(0deg);  opacity: 1; }
+    to   { transform: rotateY(90deg); opacity: 0; }
+}
+
+@keyframes uiFlyIn {
+    from { transform: scale(0.8) translateZ(-200px); opacity: 0; }
+    to   { transform: scale(1) translateZ(0);        opacity: 1; }
+}
+
+@keyframes uiFallIn {
+    from { transform: rotateX(-30deg) translateY(-40px); opacity: 0; }
+    to   { transform: rotateX(0deg) translateY(0);       opacity: 1; }
+}
+
+@keyframes uiWinIn {
+    from { transform: rotateX(14deg) scale(0.82); opacity: 0; }
+    to   { transform: rotateX(0deg) scale(1);     opacity: 1; }
+}
+
+@keyframes uiChampionPop {
+    0%   { transform: scale(1.15); }
+    60%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+@keyframes uiStaggerIn {
+    from { transform: rotateX(-24deg) translateY(14px); opacity: 0; }
+    to   { transform: rotateX(0deg) translateY(0);      opacity: 1; }
+}
+
+@keyframes uiScreenFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes uiScreenFadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+/* ==================================================================
+   AKSESIBILITAS — prefers-reduced-motion:
+   pengguna yang mematikan animasi di OS/browser → ganti otomatis ke
+   fade sederhana (opacity saja, tanpa transform 3D).
+   ================================================================== */
+@media (prefers-reduced-motion: reduce) {
+    .ui-flip-exit-left > *, .ui-flip-exit-right > *,
+    .screen-fade-exit {
+        animation: uiScreenFadeOut 0.2s ease-out both;
+    }
+    .ui-flip-enter-left > *, .ui-flip-enter-right > *,
+    .overlay-enter-depth > *, .overlay-enter-fall > *,
+    .win-enter > *, .screen-fade-enter {
+        animation: uiScreenFadeIn 0.2s ease-out both;
+    }
+    .stagger-child.play > *:nth-child(n),
+    .mp-result-item.mp-win-big {
+        animation-delay: 0s;
+    }
+    .stagger-child.play > *,
+    .mp-result-item.mp-win-big {
+        animation: uiScreenFadeIn 0.2s ease-out both;
+    }
+}
