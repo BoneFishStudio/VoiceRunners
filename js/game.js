@@ -156,6 +156,11 @@ const JUMP_FORCES = {
     3: -19    // Tahan lama
 };
 
+// Warna slot pemain LAIN di multiplayer (slot 1-4, selain pemain lokal yang
+// tetap pakai desain main). Dipakai utk karakter + name tag, supaya pemain
+// bisa bedain siapa siapa dari kejauhan tanpa baca nametag.
+const MP_PALETTE = ['#4bb8ff', '#ff6b6b', '#ffd93d', '#6bff8f'];
+
 // ===== GAME STATE =====
 const Game = {
     canvas: null,
@@ -191,6 +196,14 @@ const Game = {
     particles: [],
     jumpTrail: [], // Jejak karakter saat lompat
     scorePopups: [], // Floating score text (+10, +50)
+    
+    // State render pemain lain (multiplayer):
+    // - _mpColorMap: playerId → warna slot (stabil per sesi, bukan random per frame)
+    // - _mpSmoothX : playerId → posisi X ter-interpolasi (update 100ms dicemplungin halus)
+    // - _mpDeath   : playerId → timestamp mulai animasi gugur (fade 0.5s, bukan hilang mendadak)
+    _mpColorMap: {},
+    _mpSmoothX: {},
+    _mpDeath: {},
     
     // Game stats
     score: 0,
@@ -631,6 +644,11 @@ const Game = {
         this.particles = [];
         this.jumpTrail = [];
         this.scorePopups = [];
+        
+        // Reset state render pemain lain (multiplayer) — run baru = mapping baru
+        this._mpColorMap = {};
+        this._mpSmoothX = {};
+        this._mpDeath = {};
         
         this.score = 0;
         this.distance = 0;
@@ -1942,7 +1960,10 @@ const Game = {
         
         // Send final score to multiplayer
         if (this.isMultiplayer) {
-            Multiplayer.updatePlayerState(this.score, Math.floor(this.distance), this.lives, false);
+            Multiplayer.updatePlayerState(this.score, Math.floor(this.distance), this.lives, false, {
+                isJumping: false,
+                jumpProgress: 0
+            });
         }
     },
     
@@ -3133,54 +3154,175 @@ const Game = {
         
         const players = Multiplayer.currentRoomData.players || {};
         const myId = Multiplayer.playerId;
+        const order = Multiplayer.currentRoomData.playerOrder || Object.keys(players);
+        const w = this.logicalW;
+        const gy = this.player.groundY;
+        const now = performance.now();
+        // Faktor skala selisih jarak (meter) → piksel di layar. 0.4 = pemain yang
+        // unggul/tertinggal terlihat proporsional tanpa keluar layar terlalu cepat.
+        const SCALE_FACTOR = 0.4;
+        const MARGIN = 24;
+        // Apex lompat lokal level 3 (v²/2g) — dipakai utk render pose lompat
+        // pemain lain dengan KURVA yang sama persis seperti karakter lokal.
+        const apexMax = (JUMP_FORCES[3] * JUMP_FORCES[3]) / (2 * GRAVITY);
         
-        // Draw other players as smaller silhouettes
-        let index = 0;
-        for (const pid in players) {
-            if (pid === myId) continue;
-            const p = players[pid];
-            if (!p.alive) continue;
+        // Slot terurut = urutan gabung (playerOrder) → variasi animasi tiap pemain
+        const others = order
+            .map(pid => players[pid])
+            .filter(p => p && p.id !== myId);
+        
+        others.forEach((p, slot) => {
+            const pid = p.id;
+            const color = this._assignMpColor(pid);
             
-            // Other player position (offset in multiplayer view)
-            const offsetX = (index + 1) * 60;
-            const otherX = this.player.x - 100 - offsetX;
+            // ⚰️ PEMAIN GUGUR: fade out 0.5 detik + siluet rebah, baru hilang total.
+            // Tanpa ini pemain lain "lenyap" mendadak — sulit dibaca siapa mati.
+            if (p.alive === false) {
+                if (!this._mpDeath[pid]) this._mpDeath[pid] = now;
+                const t = (now - this._mpDeath[pid]) / 1000;
+                if (t > 0.5) {
+                    delete this._mpDeath[pid];
+                    delete this._mpSmoothX[pid];
+                    return;
+                }
+                const fade = Math.max(0, 1 - t / 0.5);
+                const x = (this._mpSmoothX[pid] !== undefined) ? this._mpSmoothX[pid] : this.player.x + 60;
+                ctx.save();
+                ctx.globalAlpha = 0.7 * fade;
+                ctx.translate(x, gy);
+                // Rebah ke belakang mengikuti waktu — kesan "tumbang", bukan vanish
+                ctx.rotate(-Math.min(1, t * 2.5) * 1.1);
+                ctx.fillStyle = this._mpShade(color, 0.5);
+                this.drawRunnerSilhouette(ctx, 0, 0, 0);
+                // Lingkaran debu saat tumbang
+                ctx.globalAlpha = 0.35 * fade;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(6, 2, 3 + (1 - fade) * 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                return;
+            }
+            // Kalau pernah tercatat gugur tapi ternyata hidup lagi (revive/checkpoint) — reset
+            if (this._mpDeath[pid]) delete this._mpDeath[pid];
+            
+            // 📏 POSISI X dari selisih jarak ASLI, bukan offset statis.
+            // diff positif = dia di depan, negatif = di belakang kita.
+            const distDiff = (p.distance || 0) - Math.floor(this.distance);
+            const targetX = this.player.x + distDiff * SCALE_FACTOR;
+            // Smoothing: update datang tiap 100ms → lerp biar tidak melompat-lompat
+            const prev = (this._mpSmoothX[pid] !== undefined) ? this._mpSmoothX[pid] : targetX;
+            const x = Math.max(MARGIN, Math.min(w - MARGIN, prev + (targetX - prev) * 0.25));
+            this._mpSmoothX[pid] = x;
+            
+            // 🦘 POSE LOMPAT: pakai jumpProgress (0-1) yang dikirim client asal.
+            // Tinggi diangkat proporsional ke apex yang sama dgn lompat lokal
+            // (jumpProgress = (groundY - y) / apexMax dari sisi pengirim).
+            const jp = Math.min(1, Math.max(0, p.jumpProgress || 0));
+            const lift = jp * apexMax;
+            const isAir = p.isJumping || jp > 0.01;
+            
+            // Animasi lari/terbang: fase unik per slot biar tidak serempak (berbeda
+            // dari pemain lokal, cukup variasi kecil — bukan sistem animasi baru)
+            const phase = this.frameCount * 0.12 + slot * 1.9;
+            const bounce = isAir ? 0 : Math.abs(Math.sin(phase)) * 3;
+            const legSwing = isAir ? 2 : Math.sin(phase) * 7;
+            const armSwing = isAir ? 1.5 : Math.sin(phase + Math.PI) * 7;
             
             ctx.save();
-            ctx.globalAlpha = 0.6;
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            
-            // Simple body
-            ctx.fillRect(otherX - 4, this.player.groundY - 35, 8, 18);
-            ctx.beginPath();
-            ctx.arc(otherX, this.player.groundY - 40, 6, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Name tag
-            ctx.font = '11px "Inter", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.fillText(p.name || 'Pemain', otherX, this.player.groundY - 55);
-            
-            // Score
-            ctx.font = '10px "Inter", sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.fillText('Skor: ' + p.score, otherX, this.player.groundY - 42);
-            
+            ctx.globalAlpha = 0.85;
+            ctx.translate(x, gy - lift);
+            ctx.scale(0.8, 0.8);
+            // Outline gelap di belakang warna biar kontras di semua tema
+            ctx.fillStyle = this._mpShade(color, 0.45);
+            ctx.save();
+            ctx.scale(1.07, 1.07);
+            this.drawRunnerSilhouette(ctx, bounce, legSwing, armSwing);
+            ctx.restore();
+            ctx.fillStyle = color;
+            this.drawRunnerSilhouette(ctx, bounce, legSwing, armSwing);
             ctx.restore();
             
-            index++;
+            // 🏷️ NAME TAG + SKOR + SELISIH JARAK (font scale mengikuti lebar layar,
+            // bukan ukuran fixed — biar tetap terbaca di HP kecil & monitor besar)
+            const fs = this._mpFontSize();
+            const tagY = gy - lift - 50;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.font = '600 ' + fs + 'px "Inter", sans-serif';
+            ctx.fillStyle = color;
+            ctx.fillText(p.name || 'Pemain', x, tagY);
+            // Skor
+            ctx.font = '500 ' + Math.max(9, fs - 1) + 'px "Inter", sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.65)';
+            ctx.fillText('Skor: ' + (p.score || 0), x, tagY + fs + 2);
+            // Selisih jarak: +12m (di depan) / -5m (di belakang) — posisi asli terlihat
+            if (Math.abs(distDiff) >= 1) {
+                const diffTxt = distDiff > 0 ? '+' + Math.round(distDiff) + 'm' : '-' + Math.round(Math.abs(distDiff)) + 'm';
+                ctx.fillStyle = distDiff > 0 ? 'rgba(120,255,150,0.8)' : 'rgba(255,150,120,0.8)';
+                ctx.fillText(diffTxt, x, tagY + fs * 2 + 4);
+            }
+            ctx.restore();
+        });
+    },
+    
+    // ===== HELPERS RENDER PEMAIN LAIN =====
+    
+    // Warna slot unik: prioritas warna yang belum dipakai pemain lain di sesi ini,
+    // fallback hash playerId (stabil antar render, tidak random tiap frame).
+    _assignMpColor(pid) {
+        if (this._mpColorMap[pid]) return this._mpColorMap[pid];
+        const used = {};
+        Object.keys(this._mpColorMap).forEach(k => { used[this._mpColorMap[k]] = true; });
+        let chosen = null;
+        for (let i = 0; i < MP_PALETTE.length; i++) {
+            if (!used[MP_PALETTE[i]]) { chosen = MP_PALETTE[i]; break; }
         }
+        if (!chosen) {
+            let h = 0;
+            for (let i = 0; i < pid.length; i++) h = (h * 31 + pid.charCodeAt(i)) | 0;
+            chosen = MP_PALETTE[Math.abs(h) % MP_PALETTE.length];
+        }
+        this._mpColorMap[pid] = chosen;
+        return chosen;
+    },
+    
+    // Gelapkan/terangkan warna hex dengan multiplier k (0-1) — utk outline & tone gelap
+    _mpShade(hex, k) {
+        const m = hex.replace('#', '');
+        const r = Math.round(parseInt(m.substr(0, 2), 16) * k);
+        const g = Math.round(parseInt(m.substr(2, 2), 16) * k);
+        const b = Math.round(parseInt(m.substr(4, 2), 16) * k);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    },
+    
+    // Ukuran font name tag pemain lain: scale pelan dengan lebar layar logical
+    // (10px di layar ~360px, 13px di layar ~800px+) — tetap terbaca di semua device.
+    _mpFontSize() {
+        return Math.max(10, Math.min(13, Math.round(this.logicalW * 0.016)));
     },
     
     // ===== MULTIPLAYER SYNC =====
     
     sendMPUpdate() {
         if (!this.isMultiplayer || this.state === 'gameOver' || this.state === 'paused') return;
+        // Kirim juga status lompat: isJumping + jumpProgress (0-1 relatif ke
+        // apex lompat level 3) — dipakai client lain utk render pose lompat
+        // yang sebenarnya, bukan siluet statis.
+        const p = this.player;
+        const apexMax = (JUMP_FORCES[3] * JUMP_FORCES[3]) / (2 * GRAVITY);
+        const jumpProgress = (p.y < p.groundY)
+            ? Math.min(1, Math.max(0, (p.groundY - p.y) / apexMax))
+            : 0;
         Multiplayer.updatePlayerState(
             this.score,
             Math.floor(this.distance),
             this.lives,
-            this.lives > 0
+            this.lives > 0,
+            {
+                isJumping: p.isJumping || p.y < p.groundY,
+                jumpProgress: jumpProgress
+            }
         );
     },
     

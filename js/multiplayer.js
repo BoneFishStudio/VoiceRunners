@@ -438,6 +438,25 @@ const Multiplayer = {
                 this.roomRef.remove().catch(() => {});
                 return;
             }
+            
+            // 🦵 Deteksi di-KICK oleh moderator: ada flag /rooms/{code}/kicks/{playerId}
+            if (data.kicks && data.kicks[this.playerId]) {
+                this.handleKicked();
+                return;
+            }
+            
+            // 🔁 Autofix host: kalau host tiba-tiba hilang (di-kick / disconnect),
+            // pindahkan host ke pemain pertama yang tersisa — room tetap jalan.
+            if (data.host && livePlayers[data.host] === undefined) {
+                const order = Array.isArray(data.playerOrder) ? data.playerOrder : [];
+                const nextHost = order.find(id => livePlayers[id]) || Object.keys(livePlayers)[0];
+                if (nextHost && this._lastHostFix !== nextHost && this.roomRef) {
+                    this._lastHostFix = nextHost;
+                    this.roomRef.child('host').set(nextHost).catch(() => {});
+                    return; // tunggu update berikutnya — biar UI pakai host terbaru
+                }
+            }
+            
             this.currentRoomData = data;
             this.updateRoomUI(data);
             
